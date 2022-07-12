@@ -1,6 +1,6 @@
 *.pkl
-all_w_rv_phot.h5
-vel_err_orb_err_rvcorr_all.h5
+gaia*.h5
 *.csv
 simulations/
+data/archive/
 *.tar.gz
