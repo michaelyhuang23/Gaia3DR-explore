@@ -5,4 +5,5 @@ vel*.h5
 *.csv
 simulations/
 data/archive/
+data/m12f_cluster_data_v2.h5
 *.tar.gz
