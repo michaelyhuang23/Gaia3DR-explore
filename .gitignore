@@ -1,5 +1,7 @@
 *.pkl
 gaia*.h5
+all*.h5
+vel*.h5
 *.csv
 simulations/
 data/archive/
