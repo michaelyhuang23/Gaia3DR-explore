@@ -39,12 +39,12 @@ dataset = ClusterDataset(df, feature_columns, 'cluster_id')
 dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
 
 mapper = ClusterMap(len(feature_columns), [256, 256, 3], device=device)
-classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
-model = ClassificationModel(len(feature_columns), id_count, device=device, mapper=mapper, classifier=classifier)
-#pairer = PairwiseHead(metric='euclidean')
-#model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
+#classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
+#model = ClassificationModel(len(feature_columns), id_count, device=device, mapper=mapper, classifier=classifier)
+pairer = PairwiseHead(metric='euclidean')
+model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
 clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
-optimizer = Adam(model.parameters(), lr=0.003, weight_decay=1e-5)
+optimizer = Adam(model.parameters(), lr=0.0003, weight_decay=1e-5)
 
 def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	model.train()
@@ -92,10 +92,10 @@ def test_epoch_step_classification(epoch, dataloader, model, num_classes, device
 	print(f'count:\n {pd.DataFrame(metrics.count_matrix)}, \n precision:\n {pd.DataFrame(np.round(metrics.precision_matrix,2))}, \n recall: \n{pd.DataFrame(np.round(metrics.recall_matrix,2))}')
 	torch.save(model, f'weights/model_gaussian_256_256_3_epoch{epoch}.pth')
 
-def test_epoch_step_cluster(dataset, model, num_classes, device, sample_size=10000):
+def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
 	model.eval()
 	model.config(False)
-	sample_ids = np.random.choice(len(dataset), min(len(dataset),sample_size))
+	sample_ids = np.random.choice(len(dataset), min(len(dataset), sample_size))
 	features = dataset.features[sample_ids]
 	labels = dataset.labels[sample_ids]
 	features.to(device)
@@ -106,13 +106,14 @@ def test_epoch_step_cluster(dataset, model, num_classes, device, sample_size=100
 	cluster_eval = ClusterEvalIoU(preds, labels.numpy())
 	print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
 	print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
+	torch.save(model, f'weights/model_pairwise_256_256_3_epoch{epoch}.pth')
 	
 
 for epoch in range(EPOCH):
 	train_epoch_step(epoch, dataloader, model, optimizer, device)
 	if (epoch+1) % 10 == 0:
 		with torch.no_grad():
-			test_epoch_step_classification(epoch, dataloader, model, id_count, device) # we should use test data loader
+			test_epoch_step_cluster(epoch, dataset, model, id_count, device) # we should use test data loader
 
 
 

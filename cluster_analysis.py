@@ -57,7 +57,7 @@ class C_GaussianMixture(Clusterer):
         if columns != None:
             self.data = data[columns].copy().to_numpy()
         else:
-            self.data = data.copy().to_numpy()
+            self.data = data.copy()
         super().add_data(standardization_method=standardization_method)
 
     def fit(self, epoch=100):
