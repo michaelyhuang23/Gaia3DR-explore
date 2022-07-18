@@ -35,7 +35,7 @@ class ClassificationHead(nn.Module):
 		if y == None:
 			preds = torch.argmax(X, dim=-1)
 			scores = F.softmax(X, dim=-1)
-			return X, scores, preds, scores[:,preds]
+			return X, scores, preds, scores.gather(-1, preds[...,None]).squeeze()
 		else:
 			if self.weights is None:
 				return F.cross_entropy(X, y)
@@ -43,7 +43,7 @@ class ClassificationHead(nn.Module):
 				return F.cross_entropy(X, y, weight=self.weights)
 
 class GaussianHead(nn.Module):
-	def __init__(self, input_size, num_classes, weights=None, device='cpu'):
+	def __init__(self, input_size, num_classes, weights=None, regularize=0.1, device='cpu'):
 		super().__init__()
 		self.device = device
 		self.input_size = input_size
@@ -51,23 +51,25 @@ class GaussianHead(nn.Module):
 		self.W = nn.Parameter(torch.rand(self.num_classes, self.input_size)*2-1) # centered at 0, with spread=1
 		self.W.requires_grad = True
 		self.weights = weights
+		self.regularize = regularize
 	
 	def forward(self, X, y=None):
 		'''
 		X = (batch, features)
 		y = (batch)
 		'''
+		avg_dist = torch.mean(X**2)
 		X = -torch.mean((X[:,None,:] - self.W[None,...])**2, dim=-1) # mean standardizes distance, standard distance in kd space is sqrt(k)*sigma
 		# applying crossentropy loss on this is equivalent to standard variance gaussian assumptions
 		if y == None:
 			preds = torch.argmax(X, dim=-1)
 			scores = F.softmax(X, dim=-1)
-			return X, scores, preds, scores[:, preds]
+			return X, scores, preds, scores.gather(-1, preds[...,None]).squeeze()
 		else:
 			if self.weights is None:
-				return F.cross_entropy(X, y)
+				return F.cross_entropy(X, y) + self.regularize*avg_dist
 			else:
-				return F.cross_entropy(X, y, weight=self.weights)
+				return F.cross_entropy(X, y, weight=self.weights) + self.regularize*avg_dist
 
 
 class ClassificationModel(nn.Module):
