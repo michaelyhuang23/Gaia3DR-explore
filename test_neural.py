@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import numpy as np
 import plotly.express as px
+from collections import Counter
 
 from neural_dataset import ClusterDataset
 from cluster_analysis import C_HDBSCAN, C_GaussianMixture
@@ -12,7 +13,7 @@ from utils import cart2spherical
 
 
 device = 'cpu'
-sample_size = 10000
+sample_size = 100000
 EPOCH = 500
 data_root = 'data'
 dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2.h5'
@@ -20,13 +21,16 @@ dataset_path = os.path.join(data_root, dataset_name)
 
 df = pd.read_hdf(dataset_path, key='star')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
+df = df.loc[df['cluster_id']<5].copy()
+print(Counter(df['cluster_id']))
+
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
 
 dataset = ClusterDataset(df, feature_columns, 'cluster_id')
-sample_ids = np.random.choice(len(dataset), min(len(dataset),sample_size))
+sample_ids = np.arange(len(dataset))#np.random.choice(len(dataset), min(len(dataset),sample_size), replace=False)
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_pairwise_256_256_3_epoch{189}.pth')
+	model = torch.load(f'weights/model_gaussian_256_256_3_epoch{100}.pth')
 	model.eval()
 	model.config(True)
 

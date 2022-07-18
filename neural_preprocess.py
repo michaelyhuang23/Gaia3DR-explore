@@ -42,7 +42,36 @@ class ClassificationHead(nn.Module):
 			else:
 				return F.cross_entropy(X, y, weight=self.weights)
 
-class GaussianHead(nn.Module):
+class SimpleGaussianHead(nn.Module): # this can be interpreted as an adversarial gaussian mixture module
+	def __init__(self, input_size, num_classes, weights=None, regularize=0.1, device='cpu'):
+		super().__init__()
+		self.device = device
+		self.input_size = input_size
+		self.num_classes = num_classes
+		self.W = nn.Parameter(torch.rand(self.num_classes, self.input_size)*2-1) # centered at 0, with spread=1
+		self.W.requires_grad = True
+		self.weights = weights
+		self.regularize = regularize
+	
+	def forward(self, X, y=None):
+		'''
+		X = (batch, features)
+		y = (batch)
+		'''
+		avg_dist = torch.mean(X**2)
+		X = -torch.mean((X[:,None,:] - self.W[None,...])**2, dim=-1) # mean standardizes distance, standard distance in kd space is sqrt(k)*sigma
+		# applying crossentropy loss on this is equivalent to standard variance gaussian assumptions
+		if y == None:
+			preds = torch.argmax(X, dim=-1)
+			scores = F.softmax(X, dim=-1)
+			return X, scores, preds, scores.gather(-1, preds[...,None]).squeeze()
+		else:
+			if self.weights is None:
+				return F.cross_entropy(X, y) + self.regularize*avg_dist
+			else:
+				return F.cross_entropy(X, y, weight=self.weights) + self.regularize*avg_dist
+
+class GaussianHead(nn.Module): 
 	def __init__(self, input_size, num_classes, weights=None, regularize=0.1, device='cpu'):
 		super().__init__()
 		self.device = device
@@ -95,7 +124,7 @@ class ClassificationModel(nn.Module):
 
 
 class PairwiseHead(nn.Module):
-	def __init__(self, metric='euclidean', regularize=0.1):
+	def __init__(self, metric='euclidean', regularize=0.01):
 		super().__init__()
 		self.metric = metric
 		self.regularize = regularize
@@ -108,14 +137,15 @@ class PairwiseHead(nn.Module):
 		assert y is not None
 		B = X.shape[0]
 		avg_dist = torch.mean(X**2)
-		L = X[None,...].repeat(B,1,1)
-		R = X[:, None, :].repeat(1,B,1)
+		L = X[None, ...]
+		R = X[:, None, :]
 		if self.metric == 'euclidean':
-			dist = torch.mean((L - R)**2, dim=-1) 
+			dist = torch.sum((L - R)**2, dim=-1) 
 		elif self.metric == 'manhattan':
 			dist = torch.sum(torch.abs(L-R), axis=-1)
 		else:
 			raise ValueError('not fucking implemented')
+		
 		Ly = y[None,...].repeat(B,1)
 		Ry = y[...,None].repeat(1,B)
 		loss = - torch.mean((Ly != Ry) * torch.log(1.01-torch.exp(-dist))) - torch.mean((Ly == Ry) * torch.log(torch.exp(-dist)))  # 0.01 is for stability of log

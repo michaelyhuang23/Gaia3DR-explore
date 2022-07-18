@@ -22,6 +22,7 @@ dataset_path = os.path.join(data_root, dataset_name)
 
 df = pd.read_hdf(dataset_path, key='star')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
+df = df.loc[df['cluster_id']<4].copy()
 
 print(df.columns)
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
@@ -36,7 +37,7 @@ weights /= np.linalg.norm(weights)
 weights = torch.tensor(weights).float()
 
 dataset = ClusterDataset(df, feature_columns, 'cluster_id')
-dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
 mapper = ClusterMap(len(feature_columns), [256, 256, 3], device=device)
 #classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
@@ -44,7 +45,7 @@ mapper = ClusterMap(len(feature_columns), [256, 256, 3], device=device)
 pairer = PairwiseHead(metric='euclidean')
 model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
 clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
-optimizer = Adam(model.parameters(), lr=0.000001, weight_decay=1e-5)
+optimizer = Adam(model.parameters(), lr=0.00001, weight_decay=1e-5)
 
 def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	model.train()
@@ -68,7 +69,7 @@ def test_epoch_step_classification(epoch, dataloader, model, num_classes, device
 	dataloader_bar = tqdm(dataloader)
 	t_preds = []
 	t_labels = []
-	TP_class = torch.zeros((26)).long()
+	TP_class = torch.zeros((id_count)).long()
 	for features, labels in dataloader_bar:
 		features.to(device)
 		labels.to(device)
