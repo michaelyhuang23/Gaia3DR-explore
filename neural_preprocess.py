@@ -3,23 +3,28 @@ from torch import nn
 import torch.nn.functional as F
 
 class ClusterMap(nn.Module):
-	def __init__(self, input_size, layer_sizes, device):
+	def __init__(self, input_size, layer_sizes, device='cpu'):
 		super().__init__()
 		self.device = device
 		self.linears = nn.ModuleList()
 		for i, size in enumerate(layer_sizes):
 			prev_size = input_size if i==0 else layer_sizes[i-1]
 			self.linears.append(nn.Linear(prev_size, size, device=self.device))
-			if i < len(layer_sizes)-1:
-				self.linears.append(nn.ReLU())
+		self.output_size = layer_sizes[-1]
 
 	def forward(self, X):
-		return self.linears(X)
+		for i,linear in enumerate(self.linears):
+			X = linear(X)
+			if i != len(self.linears)-1:
+				X = F.relu(X)
+		return X
 
 class ClassificationHead(nn.Module):
-	def __init__(self, input_size, num_classes, device):
+	def __init__(self, input_size, num_classes, weights=None, device='cpu'):
 		super().__init__()
-		self.classifier = nn.Linear(input_size, num_classes)
+		self.device = device
+		self.classifier = nn.Linear(input_size, num_classes, device=self.device)
+		self.weights = weights
 	
 	def forward(self, X, y=None):
 		'''
@@ -30,12 +35,43 @@ class ClassificationHead(nn.Module):
 		if y == None:
 			preds = torch.argmax(X, dim=-1)
 			scores = F.softmax(X, dim=-1)
-			return X, scores, preds, scores[preds]
+			return X, scores, preds, scores[:,preds]
 		else:
-			return F.cross_entropy(X, y)
+			if self.weights is None:
+				return F.cross_entropy(X, y)
+			else:
+				return F.cross_entropy(X, y, weight=self.weights)
+
+class GaussianHead(nn.Module):
+	def __init__(self, input_size, num_classes, weights=None, device='cpu'):
+		super().__init__()
+		self.device = device
+		self.input_size = input_size
+		self.num_classes = num_classes
+		self.W = nn.Parameter(torch.rand(self.num_classes, self.input_size)*2-1) # centered at 0, with spread=1
+		self.W.requires_grad = True
+		self.weights = weights
+	
+	def forward(self, X, y=None):
+		'''
+		X = (batch, features)
+		y = (batch)
+		'''
+		X = -torch.mean((X[:,None,:] - self.W[None,...])**2, dim=-1) # mean standardizes distance, standard distance in kd space is sqrt(k)*sigma
+		# applying crossentropy loss on this is equivalent to standard variance gaussian assumptions
+		if y == None:
+			preds = torch.argmax(X, dim=-1)
+			scores = F.softmax(X, dim=-1)
+			return X, scores, preds, scores[:, preds]
+		else:
+			if self.weights is None:
+				return F.cross_entropy(X, y)
+			else:
+				return F.cross_entropy(X, y, weight=self.weights)
+
 
 class ClassificationModel(nn.Module):
-	def __init__(self, input_size, num_classes, device, mapper = None, classifier = None):
+	def __init__(self, input_size, num_classes, device='cpu', mapper = None, classifier = None):
 		super().__init__()
 		self.device = device
 		self.mapper = mapper
@@ -43,15 +79,22 @@ class ClassificationModel(nn.Module):
 		if self.mapper == None:
 			self.mapper = ClusterMap(input_size, [input_size, input_size, input_size], self.device)
 		if self.classifier == None:
-			self.classifier = ClassificationHead(input_size, num_classes, self.device)
+			self.classifier = ClassificationHead(self.mapper.output_size, num_classes, self.device)
+
+	def config(self, classify=True):
+		self.classify = classify
 
 	def forward(self, X, y=None):
 		X = self.mapper(X)
-		return self.classifier(X, y)
+		if self.classify:
+			return self.classifier(X, y)
+		else:
+			return X
 
 
 class PairwiseHead(nn.Module):
 	def __init__(self, metric='euclidean'):
+		super().__init__()
 		self.metric = metric
 
 	def forward(self, X, y):
@@ -59,21 +102,43 @@ class PairwiseHead(nn.Module):
 		X = (batch, features),
 		y = (batch)
 		'''
-		assert(y!=None)
+		assert y is not None
 		B = X.shape[0]
-		L = X[None,...].repeat(B)
+		L = X[None,...].repeat(B,1,1)
 		R = X[:, None, :].repeat(1,B,1)
 		if self.metric == 'euclidean':
-			dist = torch.sqrt((L - R)**2, axis=-1)
+			dist = torch.sqrt(torch.sum((L - R)**2, dim=-1)+0.1)
 		elif self.metric == 'manhattan':
 			dist = torch.sum(torch.abs(L-R), axis=-1)
 		else:
 			raise ValueError('not fucking implemented')
-		# what loss? naive loss
-		Ly = y[None,...].repeat(B)
+		Ly = y[None,...].repeat(B,1)
 		Ry = y[...,None].repeat(1,B)
-		loss = -torch.mean((Ly != Ry) * torch.log(dist+0.01))  # 0.01 is for stability of log
+		loss = -torch.mean((Ly != Ry) * torch.log(torch.tanh(dist+0.1))) - torch.mean((Ly == Ry) * torch.log(1-torch.tanh(dist+0.1)))  # 0.01 is for stability of log
 		return loss
+
+class PairwiseModel(nn.Module):
+	def __init__(self, input_size, metric='euclidean', device='cpu', mapper = None, pairloss = None):
+		super().__init__()
+		self.device = device
+		self.mapper = mapper
+		self.pairloss = pairloss
+		if self.mapper == None:
+			self.mapper = ClusterMap(input_size, [input_size, input_size, input_size], self.device)
+		if self.pairloss == None:
+			self.pairloss = PairwiseHead(metric)
+
+	def config(self, pair=True):
+		self.pair = pair
+
+	def forward(self, X, y=None):
+		X = self.mapper(X)
+		if y is None or self.pair == False:
+			return X
+		elif self.pair == True:
+			return self.pairloss(X, y)
+		else:
+			raise ValueError('parameter not fucking set correctly')
 
 
 

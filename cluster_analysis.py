@@ -36,7 +36,7 @@ class C_HDBSCAN(Clusterer):
         if columns != None:
             self.data = data[columns].copy().to_numpy()
         else:
-            self.data = data.copy().to_numpy()
+            self.data = data.copy()
         super().add_data(standardization_method=standardization_method)
 
     def fit(self):
@@ -65,33 +65,4 @@ class C_GaussianMixture(Clusterer):
         return self.cluster.fit_predict(self.data)
         
 
-
-class ClusterEvalIoU:
-    def __init__(self, preds, labels, IoU_thres=0.5):
-        super().__init__()
-        self.preds = preds
-        self.labels = labels
-        self.IoU_thres = IoU_thres
-
-        unique_labels = Counter(list(self.labels))
-        unique_preds = Counter(list(self.preds))
-
-        self.TP = 0
-        for cluster_id in unique_labels.keys():
-            point_ids = np.argwhere(self.labels == cluster_id)[:,0]
-            mode, count = stats.mode(self.preds[point_ids], axis=None)
-            mode = mode[0]
-            count = count[0]
-            #print(count, unique_labels[cluster_id], unique_preds[mode])
-            IoU = count / (unique_labels[cluster_id]+unique_preds[mode]-count)
-            if mode>-1 and IoU >= IoU_thres:
-                self.TP+=1
-
-        self.P = len(unique_preds) - (1 if unique_preds[-1]!=0 else 0)
-        self.T = len(unique_labels)
-        self.precision = self.TP / self.P  # what percent of clusters are actual clusters
-        self.recall = self.TP / self.T  # what percent of actual clusters are identified
-
-    def __call__(self):
-        return self.precision, self.recall
 
