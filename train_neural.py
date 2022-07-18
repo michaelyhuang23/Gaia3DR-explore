@@ -44,7 +44,7 @@ model = ClassificationModel(len(feature_columns), id_count, device=device, mappe
 #pairer = PairwiseHead(metric='euclidean')
 #model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
 clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
-optimizer = Adam(model.parameters(), lr=0.003)
+optimizer = Adam(model.parameters(), lr=0.003, weight_decay=1e-5)
 
 def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	model.train()
@@ -110,7 +110,7 @@ def test_epoch_step_cluster(dataset, model, num_classes, device, sample_size=100
 
 for epoch in range(EPOCH):
 	train_epoch_step(epoch, dataloader, model, optimizer, device)
-	if (epoch+1) % 1 == 0:
+	if (epoch+1) % 10 == 0:
 		with torch.no_grad():
 			test_epoch_step_classification(epoch, dataloader, model, id_count, device) # we should use test data loader
 
