@@ -95,9 +95,10 @@ class ClassificationModel(nn.Module):
 
 
 class PairwiseHead(nn.Module):
-	def __init__(self, metric='euclidean'):
+	def __init__(self, metric='euclidean', regularize=0.1):
 		super().__init__()
 		self.metric = metric
+		self.regularize = regularize
 
 	def forward(self, X, y):
 		'''
@@ -106,17 +107,19 @@ class PairwiseHead(nn.Module):
 		'''
 		assert y is not None
 		B = X.shape[0]
+		avg_dist = torch.mean(X**2)
 		L = X[None,...].repeat(B,1,1)
 		R = X[:, None, :].repeat(1,B,1)
 		if self.metric == 'euclidean':
-			dist = torch.sqrt(torch.sum((L - R)**2, dim=-1)+0.1)
+			dist = torch.mean((L - R)**2, dim=-1) 
 		elif self.metric == 'manhattan':
 			dist = torch.sum(torch.abs(L-R), axis=-1)
 		else:
 			raise ValueError('not fucking implemented')
 		Ly = y[None,...].repeat(B,1)
 		Ry = y[...,None].repeat(1,B)
-		loss = -torch.mean((Ly != Ry) * torch.log(torch.tanh(dist+0.1))) - torch.mean((Ly == Ry) * torch.log(1-torch.tanh(dist+0.1)))  # 0.01 is for stability of log
+		loss = - torch.mean((Ly != Ry) * torch.log(1.01-torch.exp(-dist))) - torch.mean((Ly == Ry) * torch.log(torch.exp(-dist)))  # 0.01 is for stability of log
+		loss += self.regularize * avg_dist
 		return loss
 
 class PairwiseModel(nn.Module):

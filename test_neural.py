@@ -26,19 +26,15 @@ dataset = ClusterDataset(df, feature_columns, 'cluster_id')
 sample_ids = np.random.choice(len(dataset), min(len(dataset),sample_size))
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_gaussian_256_256_3_epoch{79}.pth')
+	model = torch.load(f'weights/model_pairwise_256_256_3_epoch{189}.pth')
 	model.eval()
 	model.config(True)
 
-	X, probs, preds, scores = model(dataset.features[sample_ids])
 	mapped_features = model.mapper(dataset.features[sample_ids])
 
 	labels = dataset.labels[sample_ids]
+	label_names = [f'cluster_{label}' for label in labels]
 
-	label_names = [f'cluster_{label}' for label in preds]
-	label_range = [f'cluster_{label}' for label in range(model.classifier.W.shape[0])]
-	fig = px.scatter_3d(x=model.classifier.W[:,0], y=model.classifier.W[:,1], z=model.classifier.W[:,2], color=label_range)
-	fig.show()
 	fig = px.scatter_3d(x=mapped_features[:,0], y=mapped_features[:,1], z=mapped_features[:,2], color=label_names)
 	fig.show()
 

@@ -44,7 +44,7 @@ mapper = ClusterMap(len(feature_columns), [256, 256, 3], device=device)
 pairer = PairwiseHead(metric='euclidean')
 model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
 clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
-optimizer = Adam(model.parameters(), lr=0.0003, weight_decay=1e-5)
+optimizer = Adam(model.parameters(), lr=0.000001, weight_decay=1e-5)
 
 def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	model.train()
@@ -95,12 +95,13 @@ def test_epoch_step_classification(epoch, dataloader, model, num_classes, device
 def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
 	model.eval()
 	model.config(False)
-	sample_ids = np.random.choice(len(dataset), min(len(dataset), sample_size))
+	sample_ids = np.random.choice(len(dataset), min(len(dataset), sample_size), replace=False)
 	features = dataset.features[sample_ids]
 	labels = dataset.labels[sample_ids]
 	features.to(device)
 	labels.to(device)
 	mapped_features = model(features)
+	print(mapped_features.shape)
 	clusterer.add_data(mapped_features.numpy())
 	preds = clusterer.fit()
 	cluster_eval = ClusterEvalIoU(preds, labels.numpy())
@@ -111,7 +112,7 @@ def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_s
 
 for epoch in range(EPOCH):
 	train_epoch_step(epoch, dataloader, model, optimizer, device)
-	if (epoch+1) % 10 == 0:
+	if (epoch+1) % 1 == 0:
 		with torch.no_grad():
 			test_epoch_step_cluster(epoch, dataset, model, id_count, device) # we should use test data loader
 
