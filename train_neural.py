@@ -24,11 +24,8 @@ print(f'running with {device}')
 
 df = pd.read_hdf(dataset_path, key='star')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-<<<<<<< HEAD
 df = df.loc[df['cluster_id']<20].copy()
-=======
-#df = df.loc[df['cluster_id']<4].copy()
->>>>>>> f53feff19b87c78433fb3bd6a95e56ce95ed30d0
+
 
 print(df.columns)
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
@@ -60,16 +57,9 @@ def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	model.config(True)
 	dataloader_bar = tqdm(dataloader)
 	t_loss = 0
-<<<<<<< HEAD
 	for stuffs in dataloader_bar:
 		stuffs = [stuff.to(device) for stuff in stuffs]
 		loss = model(*stuffs)
-=======
-	for features, labels in dataloader_bar:
-		features = features.to(device)
-		labels = labels.to(device)
-		loss = model(features, labels)
->>>>>>> f53feff19b87c78433fb3bd6a95e56ce95ed30d0
 		loss.backward()
 		optimizer.step()
 		optimizer.zero_grad()
