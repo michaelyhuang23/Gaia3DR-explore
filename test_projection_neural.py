@@ -30,7 +30,7 @@ dataset = ClusterDataset(df, feature_columns, 'cluster_id')
 sample_ids = np.arange(len(dataset))#np.random.choice(len(dataset), min(len(dataset),sample_size), replace=False)
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_gaussian_256_256_3_epoch{100}.pth')
+	model = torch.load(f'weights/model_pairwise_256_256_3_epoch{173}.pth')
 	model.eval()
 	model.config(True)
 
