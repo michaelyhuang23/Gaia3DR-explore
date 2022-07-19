@@ -14,15 +14,17 @@ from neural_preprocess import ClassificationModel, ClusterMap, ClassificationHea
 from evaluation_metrics import ClassificationAcc, ClusterEvalIoU
 from cluster_analysis import C_HDBSCAN, C_GaussianMixture
 
-device = 'cpu'
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 EPOCH = 500
 data_root = 'data'
 dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2.h5'
 dataset_path = os.path.join(data_root, dataset_name)
 
+print(f'running with {device}')
+
 df = pd.read_hdf(dataset_path, key='star')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-df = df.loc[df['cluster_id']<4].copy()
+#df = df.loc[df['cluster_id']<4].copy()
 
 print(df.columns)
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
@@ -53,8 +55,8 @@ def train_epoch_step(epoch, dataloader, model, optimizer, device):
 	dataloader_bar = tqdm(dataloader)
 	t_loss = 0
 	for features, labels in dataloader_bar:
-		features.to(device)
-		labels.to(device)
+		features = features.to(device)
+		labels = labels.to(device)
 		loss = model(features, labels)
 		loss.backward()
 		optimizer.step()
@@ -71,8 +73,8 @@ def test_epoch_step_classification(epoch, dataloader, model, num_classes, device
 	t_labels = []
 	TP_class = torch.zeros((id_count)).long()
 	for features, labels in dataloader_bar:
-		features.to(device)
-		labels.to(device)
+		features = features.to(device)
+		labels = labels.to(device)
 		logits, probs, preds, scores = model(features)
 		assert len(preds) == len(labels)
 		TP_class[labels] += preds == labels
@@ -99,11 +101,11 @@ def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_s
 	sample_ids = np.random.choice(len(dataset), min(len(dataset), sample_size), replace=False)
 	features = dataset.features[sample_ids]
 	labels = dataset.labels[sample_ids]
-	features.to(device)
-	labels.to(device)
+	features = features.to(device)
+	labels = labels.to(device)
 	mapped_features = model(features)
 	print(mapped_features.shape)
-	clusterer.add_data(mapped_features.numpy())
+	clusterer.add_data(mapped_features.cpu().numpy())
 	preds = clusterer.fit()
 	cluster_eval = ClusterEvalIoU(preds, labels.numpy())
 	print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
