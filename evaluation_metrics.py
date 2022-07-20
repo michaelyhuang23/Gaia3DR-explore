@@ -26,7 +26,6 @@ class ClassificationAcc:
         self.recall_class = self.TP_class / self.T_class
         self.precision = np.sum(self.TP_class) / np.sum(self.P_class)
         self.recall = np.sum(self.TP_class) / np.sum(self.T_class)
-        assert abs(self.precision - self.recall)<0.1
         self.avg_precision = np.mean(self.precision_class)
         self.avg_recall = np.mean(self.recall_class)
 
@@ -50,7 +49,6 @@ class ClusterEvalIoU:
             mode, count = stats.mode(self.preds[point_ids], axis=None)
             mode = mode[0]
             count = count[0]
-            #print(count, unique_labels[cluster_id], unique_preds[mode])
             IoU = count / (unique_labels[cluster_id]+unique_preds[mode]-count)
             if mode>-1 and IoU >= IoU_thres:
                 self.TP+=1
@@ -62,3 +60,6 @@ class ClusterEvalIoU:
 
     def __call__(self):
         return self.precision, self.recall
+
+
+

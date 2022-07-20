@@ -10,17 +10,16 @@ class ContrastModel(nn.Module):
 		for i, size in enumerate(layer_sizes):
 			prev_size = input_size*2 if i==0 else layer_sizes[i-1]
 			self.linears.append(nn.Linear(prev_size, size, device=self.device))
-		self.classifier = nn.Linear(layer_sizes[-1]+input_size, 1, device=self.device)
+		self.classifier = nn.Linear(layer_sizes[-1], 1, device=self.device)
 
 	def config(self, classify=True):
 		self.classify = classify
 
 	def forward(self, X1, X2, y1=None, y2=None):
-		X = torch.concat([X1, X2], dim=-1)
+		X = torch.concat([X1-X2, (X1+X2)/2], dim=-1)
 		for i,linear in enumerate(self.linears):
 			X = linear(X)
 			X = F.relu(X)
-		X = torch.concat([X, torch.abs(X1 - X2)], dim=-1)
 		X = torch.sigmoid(self.classifier(X))
 		if y1 is not None and y2 is not None and self.classify:
 			return F.binary_cross_entropy(X[:,0], (y1!=y2).float())
@@ -160,7 +159,6 @@ class PairwiseHead(nn.Module):
 		X = (batch, features),
 		y = (batch)
 		'''
-		assert y is not None
 		B = X.shape[0]
 		avg_dist = torch.mean(X**2)
 		L = X[None, ...]

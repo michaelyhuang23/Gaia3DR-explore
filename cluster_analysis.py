@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.cluster import DBSCAN, KMeans, AffinityPropagation
+from sklearn.cluster import DBSCAN, KMeans, AffinityPropagation, SpectralClustering
 from sklearn.mixture import GaussianMixture
 from hdbscan import HDBSCAN
 from scipy import stats
@@ -20,6 +20,21 @@ class Clusterer:
 
     def fit(self):
         pass
+
+class C_Spectral(Clusterer):
+    def __init__(self, n_components=8, affinity='precomputed', assign_labels='discretize'):
+        super().__init__()
+        self.cluster = SpectralClustering(n_components, affinity=affinity, assign_labels=assign_labels)
+
+    def config(self, cluster_info=None):
+        pass
+
+    def add_data(self, adj):
+        self.affinity_matrix = adj
+
+    def fit(self):
+        self.cluster.fit(self.affinity_matrix)
+        return self.cluster.labels_
 
 class C_HDBSCAN(Clusterer):
     def __init__(self, metric='euclidean', min_cluster_size=5, min_samples=None, alpha=1.0, allow_single_cluster=False, cluster_selection_method='eom', cluster_selection_epsilon=0):

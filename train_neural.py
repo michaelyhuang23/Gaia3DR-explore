@@ -17,15 +17,28 @@ from cluster_analysis import C_HDBSCAN, C_GaussianMixture
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 EPOCH = 500
 data_root = 'data'
-dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2.h5'
+dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2'
 dataset_path = os.path.join(data_root, dataset_name)
+
+test_dataset_name = 'm12f_cluster_data_large_mass_large_cluster_v2'
+test_dataset_path = os.path.join(data_root, test_dataset_name)
+
+#5, 15, 10, 16, 19, 3, 12, 7, 13, 22, 24, 21
+easy_small_clusters = [5, 15, 10, 16, 19, 3, 12, 7, 13]
+easy_mid_clusters = [6, 17, 14, 11, 8, 9, 1, 2]
+easy_large_clusters = [4, 18]
 
 print(f'running with {device}')
 
-df = pd.read_hdf(dataset_path, key='star')
+df = pd.read_hdf(dataset_path+'.h5', key='star')
+df_std = pd.read_csv(dataset_path+'_std.csv')
+df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
+df_test_std = pd.read_csv(test_dataset_path+'_std.csv')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-df = df.loc[df['cluster_id']<20].copy()
+df_test['rstar'] = np.linalg.norm([df_test['xstar'].to_numpy(),df_test['ystar'].to_numpy(),df_test['zstar'].to_numpy()],axis=0)
 
+#df = df.loc[df['cluster_id']<20].copy()
+#df = df.loc[np.isin(df['cluster_id'], easy_small_clusters)].copy()
 
 print(df.columns)
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
@@ -40,8 +53,10 @@ weights /= np.linalg.norm(weights)
 weights = torch.tensor(weights).float()
 
 #dataset = ClusterDataset(df, feature_columns, 'cluster_id')
-dataset = ContrastDataset(df, feature_columns, 'cluster_id')
+dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std)
+test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_divs=df_test_std)
 dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=256, shuffle=True)
 
 #mapper = ClusterMap(len(feature_columns), [256, 256, 3], device=device)
 #classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
@@ -110,7 +125,7 @@ def test_epoch_step_contrastive(epoch, dataloader, model, device):
 		t_labels.extend(list((labels1 != labels2).long().numpy()))
 	metrics = ClassificationAcc(t_preds, t_labels, 2)
 	print(f'count:\n {pd.DataFrame(metrics.count_matrix)}, \n precision:\n {pd.DataFrame(np.round(metrics.precision_matrix,2))}, \n recall: \n{pd.DataFrame(np.round(metrics.recall_matrix,2))}')
-	torch.save(model, f'weights/model_contrastive_64_64_64_epoch{epoch}.pth')
+	torch.save(model, f'weights/model_contrastive_32_32_epoch{epoch}.pth')
 
 def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
 	model.eval()
@@ -128,13 +143,17 @@ def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_s
 	print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
 	print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
 	torch.save(model, f'weights/model_pairwise_256_256_3_epoch{epoch}.pth')
-	
+
 
 for epoch in range(EPOCH):
 	train_epoch_step(epoch, dataloader, model, optimizer, device)
 	if (epoch+1) % 10 == 0:
 		with torch.no_grad():
+			print('training set acc:')
 			test_epoch_step_contrastive(epoch, dataloader, model, device) # we should use test data loader
+			print('testing set acc:')
+			test_epoch_step_contrastive(epoch, test_dataloader, model, device) # we should use test data loader
+
 
 
 

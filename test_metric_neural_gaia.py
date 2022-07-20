@@ -19,46 +19,37 @@ from utils import cart2spherical, UnionFind
 # mass of host galaxy for normalization? Energy, action scales with mass of host galaxy
 
 device = 'cpu'
-sample_size = 600
+sample_size = 10000
 data_root = 'data'
-dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2.h5'
+dataset_name = 'gaia3dr_5M_full_100000.h5'
 dataset_path = os.path.join(data_root, dataset_name)
-#23, 2, 26, 4, 1, 13, 21, 7, 5, 12, 14, 19
-easy_small_clusters = [5, 15, 10, 16, 19, 3, 12, 7, 13]
-easy_mid_clusters = [6, 17, 14, 11, 8, 9, 1, 2]
-easy_large_clusters = [4, 18]
+
 
 df = pd.read_hdf(dataset_path, key='star')
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-df = df.loc[np.isin(df['cluster_id'], easy_small_clusters)].copy()
-#df = df.loc[df['cluster_id']<20].copy()
-print(Counter(df['cluster_id']))
 
-
+df['vthetastar'] = df['vzstar'].copy() # a very cheap solution for now
 feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
 sample_size = min(len(df), sample_size)
 sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
 df_trim = df.iloc[sample_ids].copy()
 df = df_trim
-dataset = ClusterDataset(df_trim, feature_columns, 'cluster_id')
-labels = dataset.labels
-print(labels)
+dataset = ClusterDataset(df_trim, feature_columns)
 
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 df['lstar'] = np.linalg.norm([df['lzstar'].to_numpy(),df['lystar'].to_numpy(),df['lxstar'].to_numpy()],axis=0)
-df['cluster_id_name'] = np.array([f'cluster {id}' for id in df['cluster_id'].to_numpy()])
 df['c_lzstar'] = df['lzstar'].to_numpy()*np.abs(df['estar'].to_numpy())**2.3
 df['c_lystar'] = df['lystar'].to_numpy()*np.abs(df['estar'].to_numpy())**2.3
 df['c_lxstar'] = df['lxstar'].to_numpy()*np.abs(df['estar'].to_numpy())**2.3
 df['s_jzrstar'] = df['jzstar'].to_numpy() - df['jrstar'].to_numpy() # mostly spherical because you can try squaring it
 df['a_jzrstar'] = df['jzstar'].to_numpy() + df['jrstar'].to_numpy() # mostly spherical because you can try squaring it
 df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-sns.scatterplot(data=df, ax=axes[0,0], x='lzstar', y='estar', hue='cluster_id_name')
-sns.scatterplot(data=df, ax=axes[0,1], x='lystar', y='estar', hue='cluster_id_name')
-sns.scatterplot(data=df, ax=axes[0,2], x='rstar', y='eccstar', hue='cluster_id_name')
-sns.scatterplot(data=df, ax=axes[1,0], x='jphistar', y='jzstar', hue='cluster_id_name')
-sns.scatterplot(data=df, ax=axes[1,1], x='jphistar', y='jrstar', hue='cluster_id_name')
-sns.scatterplot(data=df, ax=axes[1,2], x='vxstar', y='vphistar', hue='cluster_id_name')
+sns.scatterplot(data=df, ax=axes[0,0], x='lzstar', y='estar')
+sns.scatterplot(data=df, ax=axes[0,1], x='lystar', y='estar')
+sns.scatterplot(data=df, ax=axes[0,2], x='rstar', y='eccstar')
+sns.scatterplot(data=df, ax=axes[1,0], x='jphistar', y='jzstar')
+sns.scatterplot(data=df, ax=axes[1,1], x='jphistar', y='jrstar')
+sns.scatterplot(data=df, ax=axes[1,2], x='vxstar', y='vphistar')
 plt.show()
 
 def compute_distance(model, dataset, sample_size):
@@ -77,37 +68,29 @@ with torch.no_grad():
 	model.config(False)
 
 	dist = compute_distance(model, dataset, sample_size)
-	dist[dist >= 0.5] = 1
-	dist = np.minimum(dist, np.transpose(dist))
 
 	#clusterer = C_HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
-	clusterer = C_Spectral(n_components=9, assign_labels='discretize')
-	clusterer.add_data(1-dist)
+	clusterer = C_Spectral(n_components=4, assign_labels='discretize')
+	clusterer.add_data(2-dist)
 	clusters = clusterer.fit()
 
 	cluster_names = [f'cluster_{label}' for label in clusters]
-	cluster_eval = ClusterEvalIoU(clusters, labels.numpy())
-	print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
-	print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
 
 	connectivity = UnionFind(dist.shape[0])
 	net = Network()
-	unique_labels = np.unique(dataset.labels)
-	for i,lab in enumerate(dataset.labels):
+	for i in range(len(dataset)):
 		lab_cluster = int(clusters[i])
-		net.add_node(i, label=lab.item(), color=colors[lab.item()], title=str(lab.item()))
+		net.add_node(i, label=lab_cluster, color=colors[lab_cluster], title=str(lab_cluster))
 	edges = []
 	for i in range(sample_size):
 		for j in range(i+1, sample_size):
-			if dist[i,j]<0.5:
-				net.add_edge(i, j, weight=1-dist[i, j], value=1-dist[i, j], title=str(np.round(1-dist[i, j],1)))
-			#edges.append((dist[i,j], i, j))
-	# edges.sort()
-	# for d, i, j in edges:
-	# 	if connectivity.connect(i,j) : continue
-	# 	connectivity.join(i,j)
-	# 	net.add_edge(i, j, weight=1-dist[i, j], value=1-dist[i, j], title=str(np.round(1-dist[i, j],1)))
-	net.toggle_physics(False)
+			edges.append((dist[i,j]+dist[j,i], i, j))
+	edges.sort()
+	for d, i, j in edges:
+		if connectivity.connect(i,j) : continue
+		connectivity.join(i,j)
+		net.add_edge(i, j, weight=2-dist[i, j]-dist[j, i], value=2-dist[i, j]-dist[j, i], title=str(np.round(2-dist[i, j]-dist[j, i],1)))
+	net.toggle_physics(True)
 	net.show('cluster_graph.html')
 
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
