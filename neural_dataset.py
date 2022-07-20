@@ -37,9 +37,12 @@ class ClusterDataset(Dataset):
 			return self.features[idx], self.labels[idx]
 
 class ContrastDataset(Dataset):
-	def __init__(self, dataframe, features, cluster_ids, feature_divs=None):
+	def __init__(self, dataframe, features, cluster_ids, feature_divs=None, positive_percent=None):
 		super().__init__()
-		self.positive_percent = 0.3
+		if positive_percent is None:
+			self.positive_percent = 0.3
+		else:
+			self.positive_percent = positive_percent
 		self.standard_feature_divs = {'estar':1e5, 'lzstar':2000, 'lxstar':2000, 'lystar':2000, 'jzstar':2000, 'jrstar':2000, 'eccstar':1, 'rstar':4, 'feH':1, 'mgfe':0.5, 'xstar':10, 'ystar':10, 'zstar':10, 'vxstar':200, 'vystar':200, 'vzstar':200, 'vrstar':200, 'vphistar':200, 'vrstar':200, 'vthetastar':200}
 		if feature_divs is None:
 			self.feature_divs = torch.tensor([self.standard_feature_divs[feature] for feature in features])

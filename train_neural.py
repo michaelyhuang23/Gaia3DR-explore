@@ -54,7 +54,7 @@ weights = torch.tensor(weights).float()
 
 #dataset = ClusterDataset(df, feature_columns, 'cluster_id')
 dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std)
-test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_divs=df_test_std)
+test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_divs=df_test_std, positive_percent=0)
 dataloader = DataLoader(dataset, batch_size=256, shuffle=True)
 test_dataloader = DataLoader(test_dataset, batch_size=256, shuffle=True)
 
