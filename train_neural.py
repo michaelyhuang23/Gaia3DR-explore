@@ -150,7 +150,9 @@ for epoch in range(EPOCH):
 	if (epoch+1) % 10 == 0:
 		with torch.no_grad():
 			print('training set acc:')
+			dataloader.dataset.positive_percent=0
 			test_epoch_step_contrastive(epoch, dataloader, model, device) # we should use test data loader
+			dataloader.dataset.positive_percent=0.3
 			print('testing set acc:')
 			test_epoch_step_contrastive(epoch, test_dataloader, model, device) # we should use test data loader
 
