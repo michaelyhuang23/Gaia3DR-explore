@@ -18,11 +18,11 @@ from cluster_analysis import C_HDBSCAN, C_GaussianMixture
 if __name__ == '__main__':
 	device = 'cuda' if torch.cuda.is_available() else 'cpu'
 	EPOCH = 500
-	data_root = 'data'
-	dataset_name = 'm12f_cluster_data_large_mass_large_cluster_v2'
+	data_root = 'data/simulation'
+	dataset_name = 'm12f_cluster_data_large_cluster_v2'
 	dataset_path = os.path.join(data_root, dataset_name)
 
-	test_dataset_name = 'm12i_cluster_data_large_mass_large_cluster_v2'
+	test_dataset_name = 'm12i_cluster_data_large_cluster_v2'
 	test_dataset_path = os.path.join(data_root, test_dataset_name)
 
 	#5, 15, 10, 16, 19, 3, 12, 7, 13, 22, 24, 21
@@ -36,14 +36,17 @@ if __name__ == '__main__':
 	df_std = pd.read_csv(dataset_path+'_std.csv')
 	df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
 	df_test_std = pd.read_csv(test_dataset_path+'_std.csv')
-	df['rstar'] = np.linalg.norm([df['xstar'].to_numpy(),df['ystar'].to_numpy(),df['zstar'].to_numpy()],axis=0)
-	df_test['rstar'] = np.linalg.norm([df_test['xstar'].to_numpy(),df_test['ystar'].to_numpy(),df_test['zstar'].to_numpy()],axis=0)
 
 	#df = df.loc[df['cluster_id']<20].copy()
 	#df = df.loc[np.isin(df['cluster_id'], easy_small_clusters)].copy()
 
 	print(df.columns)
-	feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vrstar', 'vthetastar']
+	feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+	# [0.71216923 0.31106377 0.05795611 0.0514622  0.1477975  0.0479944
+# 0.07169756 0.05771691 0.555757   0.13819067 0.         0.
+# 0.08163675 0.         0.         0.0314592  0.1145066  0.07823427
+# 0.04907838 0.         0.         0.         0.01303631 0.
+# 0.        ]
 
 	cluster_ids = df['cluster_id'].to_numpy()
 	id_count = np.max(cluster_ids)
@@ -123,13 +126,20 @@ if __name__ == '__main__':
 		dataloader_bar = tqdm(dataloader)
 		t_preds = []
 		t_labels = []
+		t_loss = []
 		for features1, features2, labels1, labels2 in dataloader_bar:
 			scores = model(features1, features2)
 			assert len(labels1) == len(scores)
 			t_preds.extend(list(np.rint(scores.numpy()).astype(np.int32)))
 			t_labels.extend(list((labels1 != labels2).long().numpy()))
+			model.config(True)
+			loss = model(features1, features2, labels1, labels2).item()
+			t_loss.append(loss)
+			model.config(False)
+
 		metrics = ClassificationAcc(t_preds, t_labels, 2)
 		print(f'count:\n {pd.DataFrame(metrics.count_matrix)}, \n precision:\n {pd.DataFrame(np.round(metrics.precision_matrix,2))}, \n recall: \n{pd.DataFrame(np.round(metrics.recall_matrix,2))}')
+		print(f'loss: {np.mean(np.array(t_loss))}')
 		torch.save(model, f'weights/model_contrastive_scale_epoch{epoch}.pth')
 
 	def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
@@ -154,7 +164,7 @@ if __name__ == '__main__':
 		train_epoch_step(epoch, dataloader, model, optimizer, device)
 		with torch.no_grad():
 			#dataloader.dataset.global_transform()
-			if (epoch+1) % 10 == 0:
+			if (epoch+1) % 2 == 0:
 				print('training set acc:')
 				test_epoch_step_contrastive(epoch, dataloader, model, device)
 				print('testing set acc:')

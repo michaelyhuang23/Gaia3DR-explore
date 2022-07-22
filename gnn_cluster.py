@@ -42,6 +42,6 @@ class GCNCluster(nn.Module): # non-overlapping
 				X = F.relu(X)
 		S = F.softmax(X, dim=-1)
 		if self.training:
-
+			pass
 		else:
 			return S
