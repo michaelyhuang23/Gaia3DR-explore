@@ -3,8 +3,10 @@ gaia*.h5
 all*.h5
 vel*.h5
 *.csv
-!data/*.csv
+!data/m12*.csv
 simulations/
-data/archive/
-data/m12f_cluster_data_v2.h5
+data_archive/
+data/simulation/m12f_cluster_data_v2.h5
+data/simulation/m12i_cluster_data_v2.h5
+data/simulation/m12f_cluster_data_large_cluster_v2.h5
 *.tar.gz
