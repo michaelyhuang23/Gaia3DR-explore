@@ -2,8 +2,26 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
+class ScaleContrastModel(nn.Module):
+	def __init__(self, input_size, device='cpu'):
+		super().__init__()
+		self.device = device
+		self.classifier = nn.Linear(input_size, 1, device=self.device)
+
+	def config(self, classify=True):
+		self.classify = classify
+
+	def forward(self, X1, X2, y1=None, y2=None):
+		X = torch.abs(X1-X2)
+		X = torch.sigmoid(self.classifier(X))[:,0]
+		if y1 is not None and y2 is not None and self.classify:
+			return F.binary_cross_entropy(X, (y1!=y2).float())
+		else:
+			return X
+
 class ContrastModel(nn.Module):
-	def __init__(self, input_size, layer_sizes, device='cpu'):
+	def __init__(self, input_size, layer_sizes, similar_weight=1, device='cpu'):
 		super().__init__()
 		self.device = device
 		self.linears = nn.ModuleList()
@@ -11,6 +29,7 @@ class ContrastModel(nn.Module):
 			prev_size = input_size*2 if i==0 else layer_sizes[i-1]
 			self.linears.append(nn.Linear(prev_size, size, device=self.device))
 		self.classifier = nn.Linear(layer_sizes[-1], 1, device=self.device)
+		self.similar_weight = similar_weight
 
 	def config(self, classify=True):
 		self.classify = classify
@@ -20,9 +39,11 @@ class ContrastModel(nn.Module):
 		for i,linear in enumerate(self.linears):
 			X = linear(X)
 			X = F.relu(X)
-		X = torch.sigmoid(self.classifier(X))
+		X = torch.sigmoid(self.classifier(X))[:,0]
 		if y1 is not None and y2 is not None and self.classify:
-			return F.binary_cross_entropy(X[:,0], (y1!=y2).float())
+			weights = torch.ones_like(y1)
+			weights[X<0.5] *= self.similar_weight
+			return F.binary_cross_entropy(X, (y1!=y2).float(), weight=weights)
 		else:
 			return X
 

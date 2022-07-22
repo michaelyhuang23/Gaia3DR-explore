@@ -68,22 +68,22 @@ sns.scatterplot(data=df, ax=axes[1,2], x='vxstar', y='vphistar', hue='cluster_id
 plt.show()
 
 def compute_distance(model, dataset, sample_size):
-	dist = np.zeros((sample_size, sample_size))
-	for i in range(sample_size):
-		for j in range(sample_size):
-			dist[i, j] = model(dataset.features[i:i+1], dataset.features[j:j+1])
+	B = len(dataset)
+	L_features = dataset.features[None,...].repeat(B,1,1).reshape(B*B, dataset.features.shape[-1])
+	R_features = dataset.features[:,None,:].repeat(1,B,1).reshape(B*B, dataset.features.shape[-1])
+	dist = model(L_features, R_features).reshape(B,B)
 	return dist
 
 colors = ['#%06X' % randint(0, 0xFFFFFF) for i in range(27)]
 
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_contrastive_32_32_epoch{179}.pth') # 229
+	model = torch.load(f'weights/model_contrastive_32_32_epoch{59}.pth') # 229
 	model.eval()
 	model.config(False)
 
 	dist = compute_distance(model, dataset, sample_size)
-	dist[dist >= 0.5] = 1
+#	dist[dist >= 0.7] = 1
 	dist = np.minimum(dist, np.transpose(dist))
 
 	#clusterer = C_HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)

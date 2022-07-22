@@ -7,7 +7,7 @@ class JitterTransform:
 	def __init__(self, jitter_range=0.1):
 		self.jitter_range = jitter_range
 	def __call__(self, X):
-		return X + torch.randn_like(X) * self.jitter_range
+		return X + torch.ones_like(X) * (random.random()*2-1) * self.jitter_range
 
 class ScaleTransform:
 	def __init__(self, scale_range=0.1):
@@ -55,7 +55,7 @@ class ContrastDataset(Dataset):
 	def __init__(self, dataframe, features, cluster_ids, feature_divs=None, positive_percent=None, transforms=[]):
 		super().__init__()
 		if positive_percent is None:
-			self.positive_percent = 0.3
+			self.positive_percent = 0.2
 		else:
 			self.positive_percent = positive_percent
 		self.standard_feature_divs = {'estar':1e5, 'lzstar':2000, 'lxstar':2000, 'lystar':2000, 'jzstar':2000, 'jrstar':2000, 'eccstar':1, 'rstar':4, 'feH':1, 'mgfe':0.5, 'xstar':10, 'ystar':10, 'zstar':10, 'vxstar':200, 'vystar':200, 'vzstar':200, 'vrstar':200, 'vphistar':200, 'vrstar':200, 'vthetastar':200}
@@ -106,10 +106,6 @@ class ContrastDataset(Dataset):
 			cluster_id = self.cluster_ids[random.randint(0, len(self.cluster_ids)-1)]
 		other_id = self.clusters[cluster_id][random.randint(0, len(self.clusters[cluster_id])-1)]
 		feature = self.features[idx]
-		for transform in self.transforms:
-			feature = transform(feature)
 		o_feature = self.features[other_id]
-		for transform in self.transforms:
-			o_feature = transform(o_feature)
 		return feature, o_feature, self.labels[idx], self.labels[other_id]
 

@@ -10,7 +10,7 @@ from torch.optim import SGD, Adam
 from collections import Counter
 
 from neural_dataset import ClusterDataset, ContrastDataset, JitterTransform, ScaleTransform
-from neural_preprocess import ClassificationModel, ClusterMap, ClassificationHead, PairwiseHead, PairwiseModel, GaussianHead, ContrastModel
+from neural_preprocess import *
 from evaluation_metrics import ClassificationAcc, ClusterEvalIoU
 from cluster_analysis import C_HDBSCAN, C_GaussianMixture
 
@@ -57,20 +57,20 @@ if __name__ == '__main__':
 	# dataset = ClusterDataset(df, feature_columns, 'class', feature_divs=df_std, transforms=[JitterTransform(), ScaleTransform()])
 	# test_dataset = ClusterDataset(df_test, feature_columns, 'class', feature_divs=df_test_std)
 
-	dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std, transforms=[JitterTransform(), ScaleTransform()])
+	dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std, transforms=[JitterTransform(), ScaleTransform()], positive_percent=0)
 	test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_divs=df_test_std, positive_percent=0)
 
-	dataloader = DataLoader(dataset, batch_size=128, shuffle=True, num_workers=2)
-	test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True, num_workers=2)
+	dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+	test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
 	#mapper = ClusterMap(len(feature_columns), [32, 32], device=device)
 	#classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
 	#model = ClassificationModel(len(feature_columns), id_count, device=device, mapper=mapper, classifier=classifier)
 	#pairer = PairwiseHead(metric='euclidean')
 	#model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
-	model = ContrastModel(len(feature_columns), [32, 32], device=device)
+	model = ScaleContrastModel(len(feature_columns), device=device)
 	clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
-	optimizer = Adam(model.parameters(), lr=0.003, weight_decay=1e-5)
+	optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
 	def train_epoch_step(epoch, dataloader, model, optimizer, device):
 		model.train()
@@ -126,11 +126,11 @@ if __name__ == '__main__':
 		for features1, features2, labels1, labels2 in dataloader_bar:
 			scores = model(features1, features2)
 			assert len(labels1) == len(scores)
-			t_preds.extend(list(np.rint(scores[:,0].numpy()).astype(np.int32)))
+			t_preds.extend(list(np.rint(scores.numpy()).astype(np.int32)))
 			t_labels.extend(list((labels1 != labels2).long().numpy()))
 		metrics = ClassificationAcc(t_preds, t_labels, 2)
 		print(f'count:\n {pd.DataFrame(metrics.count_matrix)}, \n precision:\n {pd.DataFrame(np.round(metrics.precision_matrix,2))}, \n recall: \n{pd.DataFrame(np.round(metrics.recall_matrix,2))}')
-		torch.save(model, f'weights/model_contrastive_32_32_epoch{epoch}.pth')
+		torch.save(model, f'weights/model_contrastive_scale_epoch{epoch}.pth')
 
 	def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
 		model.eval()
@@ -152,14 +152,14 @@ if __name__ == '__main__':
 
 	for epoch in range(EPOCH):
 		train_epoch_step(epoch, dataloader, model, optimizer, device)
-		if (epoch+1) % 10 == 0:
-			with torch.no_grad():
+		with torch.no_grad():
+			#dataloader.dataset.global_transform()
+			if (epoch+1) % 10 == 0:
 				print('training set acc:')
-				dataloader.dataset.positive_percent=0
 				test_epoch_step_contrastive(epoch, dataloader, model, device)
-				dataloader.dataset.positive_percent=0.3
 				print('testing set acc:')
 				test_epoch_step_contrastive(epoch, test_dataloader, model, device)
+
 
 
 
