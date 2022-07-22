@@ -8,3 +8,4 @@ simulations/
 data_archive/
 data/simulation/*.h5
 *.tar.gz
+__pycache__/
