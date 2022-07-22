@@ -99,3 +99,45 @@ class ClusterEvalMode:
     def __call__(self):
         return self.precision, self.recall
 
+
+class ClusterEvalAll:
+    def __init__(self, preds, labels):
+        super().__init__()
+        self.results = {}
+        IoU = ClusterEvalIoU(preds, labels, IoU_thres=0.5)
+        self.results['IoU_TP'] = IoU.TP
+        self.results['IoU_T'] = IoU.T
+        self.results['IoU_P'] = IoU.P
+        self.results['IoU_precision'] = IoU.precision
+        self.results['IoU_recall'] = IoU.recall
+
+        Mode = ClusterEvalMode(preds, labels)
+        self.results['Mode_TP'] = Mode.TP
+        self.results['Mode_T'] = Mode.T
+        self.results['Mode_P'] = Mode.P
+        self.results['Mode_precision'] = Mode.precision
+        self.results['Mode_recall'] = Mode.recall
+
+        purity = Purity(preds, labels)
+        self.results['Purity'] = purity()
+
+        AMI = sklearn.metrics.adjusted_mutual_info_score(labels, preds)
+        self.results['AMI'] = AMI
+
+        ARand = sklearn.metrics.adjusted_rand_score(labels, preds)
+        self.results['ARand'] = ARand
+
+    def __call__(self):
+        return self.results
+
+    @classmethod
+    def aggregate(cls, results_list):
+        f_results = {key:0 for key in results_list[0].keys()}
+        for results in results_list:
+            for key, value in results.items():
+                f_results[key] += value
+        f_results = {key:value/len(results_list) for key,value in f_results.items()}
+        return f_results
+
+
+
