@@ -4,6 +4,7 @@ import torch
 
 class GCNConv(nn.Module):
 	def __init__(self, input_channels, output_channels, device='cpu'):
+		super().__init__()
 		self.device = device
 		self.pass_map = nn.Linear(input_channels, output_channels, device=device)
 		self.self_map =  nn.Linear(input_channels, output_channels, device=device)
@@ -51,14 +52,14 @@ class GCNEdge(nn.Module): # non-overlapping
 		for i,conv in enumerate(self.convs):
 			X = conv(self.A, X)
 			X = F.relu(X)
-		SX = torch.concat([X[self.A.indices[0]], X[self.A.indices[1]]], dim=-1)
+		SX = torch.concat([X[self.A.indices()[0]], X[self.A.indices()[1]]], dim=-1)
 		for i,linear in enumerate(self.linears):
 			SX = linear(SX)
 			if i!=len(self.linears)-1:
 				SX = F.relu(SX)
 		SX = torch.sigmoid(SX)[:,0]
 		if self.classify:
-			weights = torch.ones_like(self.C)
+			weights = torch.ones_like(self.C, dtype=torch.float32)
 			weights[SX<0.5] *= self.similar_weight
 			return F.binary_cross_entropy(SX, self.C.float(), weight=weights)
 		else:

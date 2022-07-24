@@ -130,16 +130,21 @@ class GraphDataset(ClusterDataset):
 	def __init__(self, dataframe, features, cluster_ids=None, knn=5, feature_divs=None):
 		super().__init__(dataframe, features, cluster_ids, feature_divs)
 		assert knn+1 < self.features.shape[0]/2
-		nbrs = NearestNeighbors(n_neighbors=knn+1, p=1).fit(self.features)
+		nbrs = NearestNeighbors(n_neighbors=knn+1, p=1, n_jobs=-1).fit(self.features)
 		distances, y_indices = nbrs.kneighbors(self.features)
+		print('knn finished')
 		y_indices = y_indices[:, 1:].flatten()
 		x_indices = np.arange(len(y_indices))//knn
 		indices = np.stack([x_indices, y_indices], axis=0)
-		self.A = torch.sparse_coo_tensor(indices, np.ones((len(y_indices))), (len(self.labels), len(self.labels)))
+		indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
+		indices = np.unique(indices, axis=-1)
+		counts = np.bincount(indices.flatten()) // 2
+		weights = np.ones((indices.shape[-1])) / np.sqrt(counts[indices[0]] * counts[indices[1]])
+		self.A = torch.sparse_coo_tensor(indices, weights, (len(self.labels), len(self.labels))).float().coalesce()
 		if self.labels is None:
 			self.C = None
 		else:
-			self.C = torch.tensor(self.labels[x_indices] != self.labels[y_indices])
+			self.C = self.labels[indices[0]] != self.labels[indices[1]]
 
 	def __len__(self):
 		return 1
