@@ -17,19 +17,23 @@ class GCNConv(nn.Module):
         return self.pass_map(torch.sparse.mm(A, X)) + self.self_map(X)
 
 class GCNEdge(nn.Module): # non-overlapping
-    def __init__(self, input_size, graph_layer_sizes=[32,32], linear_layer_sizes=[32], similar_weight=1, device='cpu'):
+    def __init__(self, input_size, graph_layer_sizes=[32], linear_layer_sizes=[], similar_weight=1, device='cpu'):
         super().__init__()
         self.device = device
         self.input_size = input_size
         self.convs = nn.ModuleList()
+        self.dropouts = nn.ModuleList()
         for i, size in enumerate(graph_layer_sizes):
             prev_size = input_size if i==0 else graph_layer_sizes[i-1]
+            self.dropouts.append(nn.Dropout(p=0.2))
             self.convs.append(GCNConv(prev_size, size, device=self.device))
         self.linears = nn.ModuleList()
         for i, size in enumerate(linear_layer_sizes):
             prev_size = graph_layer_sizes[-1]*2 if i==0 else linear_layer_sizes[i-1]
+            self.dropouts.append(nn.Dropout(p=0.2))
             self.linears.append(nn.Linear(prev_size, size, device=self.device))
-        prev_size = graph_layer_sizes[-1] if len(linear_layer_sizes)==0 else linear_layer_sizes[-1]
+        prev_size = graph_layer_sizes[-1]*2 if len(linear_layer_sizes)==0 else linear_layer_sizes[-1]
+        self.dropouts.append(nn.Dropout(p=0.2))
         self.linears.append(nn.Linear(prev_size, 1))
         self.similar_weight = similar_weight
 
@@ -49,11 +53,16 @@ class GCNEdge(nn.Module): # non-overlapping
         self.classify = classify
 
     def forward(self, X):
+        c = 0
         for i,conv in enumerate(self.convs):
+            X = self.dropouts[c](X)
+            c+=1
             X = conv(self.A, X)
             X = F.relu(X)
         SX = torch.concat([X[self.A.indices()[0]], X[self.A.indices()[1]]], dim=-1)
         for i,linear in enumerate(self.linears):
+            X = self.dropouts[c](X)
+            c+=1
             SX = linear(SX)
             if i!=len(self.linears)-1:
                 SX = F.relu(SX)

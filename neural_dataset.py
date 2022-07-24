@@ -49,7 +49,30 @@ class ClusterDataset(Dataset):
             self.labels = torch.tensor(cluster_ids).long()
         if self.labels is not None:
             self.labels -= torch.min(self.labels)
+
+        self.cluster_ids = list(set([label.item() for label in self.labels]))
+        self.clusters = {}
+        for i in range(len(self.labels)):
+            if self.labels[i].item() not in self.clusters:
+                self.clusters[self.labels[i].item()] = []
+            self.clusters[self.labels[i].item()].append(i)
+            
         assert self.labels is None or len(self.labels) == self.features.shape[0]
+
+    def cluster_transform(self, transforms=None):
+        if transforms is None:
+            transforms = self.transforms
+        for cluster_id in self.cluster_ids:
+            features = self.features[torch.tensor(self.clusters[cluster_id])]
+            for transform in transforms:
+                features = transform(features)
+            self.features[torch.tensor(self.clusters[cluster_id])] = features
+
+    def global_transform(self, transforms=None):
+        if transforms is None:
+            transforms = self.transforms
+        for transform in transforms:
+            self.features = transform(self.features)
 
     def __len__(self):
         return self.features.shape[0]
@@ -127,14 +150,13 @@ class ContrastDataset(Dataset):
 
 
 class GraphDataset(ClusterDataset):
-    def __init__(self, dataframe, features, cluster_ids=None, knn=5, feature_divs=None):
-        super().__init__(dataframe, features, cluster_ids, feature_divs)
-        assert knn+1 < self.features.shape[0]/2
-        nbrs = NearestNeighbors(n_neighbors=knn+1, p=1, n_jobs=-1).fit(self.features)
+    def initialize(self):
+        assert self.knn+1 < self.features.shape[0]/2
+        nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
         distances, y_indices = nbrs.kneighbors(self.features)
         print('knn finished')
         y_indices = y_indices[:, 1:].flatten()
-        x_indices = np.arange(len(y_indices))//knn
+        x_indices = np.arange(len(y_indices))//self.knn
         indices = np.stack([x_indices, y_indices], axis=0)
         indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
         indices = np.unique(indices, axis=-1)
@@ -145,6 +167,10 @@ class GraphDataset(ClusterDataset):
             self.C = None
         else:
             self.C = self.labels[indices[0]] != self.labels[indices[1]]
+
+    def __init__(self, dataframe, features, cluster_ids=None, knn=5, feature_divs=None):
+        super().__init__(dataframe, features, cluster_ids, feature_divs)
+        self.knn = knn
 
     def __len__(self):
         return 1
