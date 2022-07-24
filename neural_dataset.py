@@ -1,22 +1,35 @@
 from torch.utils.data import Dataset
+from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import random
 import torch
 
-class JitterTransform:
+class GlobalJitterTransform:
 	def __init__(self, jitter_range=0.1):
 		self.jitter_range = jitter_range
 	def __call__(self, X):
 		return X + torch.ones_like(X) * (random.random()*2-1) * self.jitter_range
 
-class ScaleTransform:
+class GlobalScaleTransform:
 	def __init__(self, scale_range=0.1):
 		self.scale_range = scale_range
 	def __call__(self, X):
 		return X * ((random.random()*2-1)*self.scale_range+1)
 
+class JitterTransform:
+	def __init__(self, jitter_range=0.1):
+		self.jitter_range = jitter_range
+	def __call__(self, X):
+		return X + torch.randn_like(X) * self.jitter_range
+
+class ScaleTransform:
+	def __init__(self, scale_range=0.1):
+		self.scale_range = scale_range
+	def __call__(self, X):
+		return X * (torch.randn_like(X) * self.scale_range + 1)
+
 class ClusterDataset(Dataset):
-	def __init__(self, dataframe, features, cluster_ids=None, feature_divs=None, transforms=[]):
+	def __init__(self, dataframe, features, cluster_ids=None, feature_divs=None):
 		super().__init__() 
 		self.standard_feature_divs = {'estar':89000, 'lzstar':2000, 'lxstar':2000, 'lystar':2000, 'jzstar':2000, 'jrstar':2000, 'eccstar':1, 'rstar':4, 'feH':1, 'mgfe':0.5, 'xstar':10, 'ystar':10, 'zstar':10, 'vxstar':200, 'vystar':200, 'vzstar':200, 'vrstar':200, 'vphistar':200, 'vrstar':200, 'vthetastar':200}
 		if feature_divs is None:
@@ -37,15 +50,12 @@ class ClusterDataset(Dataset):
 		if self.labels is not None:
 			self.labels -= torch.min(self.labels)
 		assert self.labels is None or len(self.labels) == self.features.shape[0]
-		self.transforms = transforms
 
 	def __len__(self):
 		return self.features.shape[0]
 
 	def __getitem__(self, idx):
 		feature = self.features[idx]
-		for transform in self.transforms:
-			feature = transform(feature)
 		if self.labels is None:
 			return feature, None
 		else:
@@ -86,7 +96,7 @@ class ContrastDataset(Dataset):
 		self.transforms = transforms
 		assert self.labels is None or len(self.labels) == self.features.shape[0]
 
-	def global_transform(self, transforms=None):
+	def cluster_transform(self, transforms=None):
 		if transforms is None:
 			transforms = self.transforms
 		for cluster_id in self.cluster_ids:
@@ -94,6 +104,12 @@ class ContrastDataset(Dataset):
 			for transform in transforms:
 				features = transform(features)
 			self.features[torch.tensor(self.clusters[cluster_id])] = features
+
+	def global_transform(self, transforms=None):
+		if transforms is None:
+			transforms = self.transforms
+		for transform in transforms:
+			self.features = transform(self.features)
 
 	def __len__(self):
 		return self.features.shape[0]
@@ -109,3 +125,27 @@ class ContrastDataset(Dataset):
 		o_feature = self.features[other_id]
 		return feature, o_feature, self.labels[idx], self.labels[other_id]
 
+
+class GraphDataset(ClusterDataset):
+	def __init__(self, dataframe, features, cluster_ids=None, knn=5, feature_divs=None):
+		super().__init__(dataframe, features, cluster_ids, feature_divs)
+		assert knn+1 < self.features.shape[0]/2
+		nbrs = NearestNeighbors(n_neighbors=knn+1, p=1).fit(self.features)
+		distances, y_indices = nbrs.kneighbors(self.features)
+		y_indices = y_indices[:, 1:].flatten()
+		x_indices = np.arange(len(y_indices))//knn
+		indices = np.stack([x_indices, y_indices], axis=0)
+		self.A = torch.sparse_coo_tensor(indices, np.ones((len(y_indices))), (len(self.labels), len(self.labels)))
+		if self.labels is None:
+			self.C = None
+		else:
+			self.C = torch.tensor(self.labels[x_indices] != self.labels[y_indices])
+
+	def __len__(self):
+		return 1
+
+	def __getitem__(self, idx):
+		if self.labels is None:
+			return self.A, self.features
+		else:
+			return self.A, self.features, self.C	

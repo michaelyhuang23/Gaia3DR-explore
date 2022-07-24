@@ -9,6 +9,7 @@ from collections import Counter
 from pyvis.network import Network
 from random import randint
 import sklearn
+import json
 
 from neural_dataset import ClusterDataset
 from cluster_analysis import C_HDBSCAN,C_Spectral
@@ -33,13 +34,11 @@ easy_mid_clusters = [6, 17, 14, 11, 8, 9, 1, 2]
 easy_large_clusters = [22, 15, 18, 20, 3, 8]
 
 
-def evaluate_once(model_name):
+def evaluate_once(model_name, n_components):
 	global device, sample_size, data_root, dataset_name, dataset_path, easy_large_clusters, easy_mid_clusters, easy_small_clusters
 	df = pd.read_hdf(dataset_path+'.h5', key='star')
 	#df = df.loc[np.isin(df['cluster_id'], easy_large_clusters)].copy()
 	#df = df.loc[df['cluster_id']<20].copy()
-	print(Counter(df['cluster_id']))
-
 	df_std = pd.read_csv(dataset_path+'_std.csv')
 
 
@@ -50,8 +49,6 @@ def evaluate_once(model_name):
 	df = df_trim
 	dataset = ClusterDataset(df_trim, feature_columns, 'cluster_id', feature_divs=df_std)
 	labels = dataset.labels
-	print(Counter(labels.numpy()))
-
 	# fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 	# df['lstar'] = np.linalg.norm([df['lzstar'].to_numpy(),df['lystar'].to_numpy(),df['lxstar'].to_numpy()],axis=0)
 	# df['cluster_id_name'] = np.array([f'cluster {id}' for id in df['cluster_id'].to_numpy()])
@@ -89,7 +86,7 @@ def evaluate_once(model_name):
 		dist = np.minimum(dist, np.transpose(dist))
 
 		#clusterer = C_HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
-		clusterer = C_Spectral(n_components=30, assign_labels='kmeans')
+		clusterer = C_Spectral(n_components=n_components, assign_labels='kmeans')
 		clusterer.add_data(1-dist)
 		clusters = clusterer.fit()
 
@@ -98,14 +95,20 @@ def evaluate_once(model_name):
 	return cluster_eval()
 
 
-model_name = f'model_contrastive_scale_epoch{17}.pth'
-t_results = []
-for i in range(10):
-	results = evaluate_once(model_name)
-	t_results.append(results)
+model_name_complex = f'model_contrastive_64_64_epoch{25}.pth'
+model_name_mid = f'model_contrastive_32_32_epoch{179}.pth'
+model_name_simple = f'model_contrastive_scale_epoch{17}.pth'
 
-results = ClusterEvalAll.aggregate(t_results)
-print(results)
+for n_components in [10,20,30,40,50,80,120,200]:
+	t_results = []
+	for i in range(60):
+		results = evaluate_once(model_name_simple, n_components)
+		t_results.append(results)
+
+	results = ClusterEvalAll.aggregate(t_results)
+	print(results)
+	with open(f'results/simple_spectral_1000_{n_components}.json', 'w') as f:
+	 	json.dump(results, f)
 
 
 

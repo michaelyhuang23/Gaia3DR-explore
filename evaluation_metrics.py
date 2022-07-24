@@ -66,8 +66,9 @@ class ClusterEvalIoU:
 
         self.P = len(unique_preds) - (1 if unique_preds[-1]!=0 else 0)
         self.T = len(unique_labels)
-        self.precision = np.nan if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
-        self.recall = np.nan if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
+        self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
 
     def __call__(self):
         return self.precision, self.recall
@@ -93,12 +94,35 @@ class ClusterEvalMode:
 
         self.P = len(unique_preds) - (1 if unique_preds[-1]!=0 else 0)
         self.T = len(unique_labels)
-        self.precision = np.nan if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
-        self.recall = np.nan if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
+        self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
 
     def __call__(self):
         return self.precision, self.recall
 
+
+class ClusterEvalModeC:
+    def __init__(self, preds, labels):
+        super().__init__()
+        self.preds = preds
+        self.labels = labels
+
+        unique_labels = set(list(self.labels))
+
+        self.TP_C = 0
+        for cluster_id in unique_labels:
+            point_ids = np.argwhere(self.labels == cluster_id)[:,0]
+            mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None)
+            point_ids_preds = np.argwhere(self.preds == mode_pred)[:,0]
+            mode_label, count_label = stats.mode(self.labels[point_ids_preds], axis=None)
+            if mode_pred>-1 and mode_label>-1 and mode_label == cluster_id:
+                self.TP_C += count_label[0]
+
+        self.recall_C = self.TP_C / len(self.labels)
+
+    def __call__(self):
+        return self.recall_C
 
 class ClusterEvalAll:
     def __init__(self, preds, labels):
@@ -110,6 +134,7 @@ class ClusterEvalAll:
         self.results['IoU_P'] = IoU.P
         self.results['IoU_precision'] = IoU.precision
         self.results['IoU_recall'] = IoU.recall
+        self.results['IoU_F1'] = IoU.F1
 
         Mode = ClusterEvalMode(preds, labels)
         self.results['Mode_TP'] = Mode.TP
@@ -117,6 +142,11 @@ class ClusterEvalAll:
         self.results['Mode_P'] = Mode.P
         self.results['Mode_precision'] = Mode.precision
         self.results['Mode_recall'] = Mode.recall
+        self.results['Mode_F1'] = Mode.F1
+
+        ModeC = ClusterEvalModeC(preds, labels)
+        self.results['Mode_TP_C'] = ModeC.TP_C
+        self.results['Mode_recall_C'] = ModeC.recall_C
 
         purity = Purity(preds, labels)
         self.results['Purity'] = purity()
