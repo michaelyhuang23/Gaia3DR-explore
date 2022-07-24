@@ -30,27 +30,27 @@ dataset = ClusterDataset(df, feature_columns, 'cluster_id')
 sample_ids = np.arange(len(dataset))#np.random.choice(len(dataset), min(len(dataset),sample_size), replace=False)
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_pairwise_256_256_3_epoch{173}.pth')
-	model.eval()
-	model.config(True)
+    model = torch.load(f'weights/model_pairwise_256_256_3_epoch{173}.pth')
+    model.eval()
+    model.config(True)
 
-	mapped_features = model.mapper(dataset.features[sample_ids])
+    mapped_features = model.mapper(dataset.features[sample_ids])
 
-	labels = dataset.labels[sample_ids]
-	label_names = [f'cluster_{label}' for label in labels]
+    labels = dataset.labels[sample_ids]
+    label_names = [f'cluster_{label}' for label in labels]
 
-	fig = px.scatter_3d(x=mapped_features[:,0], y=mapped_features[:,1], z=mapped_features[:,2], color=label_names)
-	fig.show()
+    fig = px.scatter_3d(x=mapped_features[:,0], y=mapped_features[:,1], z=mapped_features[:,2], color=label_names)
+    fig.show()
 
-	#clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
-	clusterer = C_GaussianMixture(n_components=26)
-	clusterer.add_data(mapped_features.numpy())
-	clusters = clusterer.fit()
-	cluster_names = [f'cluster_{label}' for label in clusters]
-	cluster_eval = ClusterEvalIoU(clusters, labels.numpy())
-	print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
-	print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
-	fig = px.scatter_3d(x=mapped_features[:,0], y=mapped_features[:,1], z=mapped_features[:,2], color=cluster_names)
-	fig.show()
+    #clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
+    clusterer = C_GaussianMixture(n_components=26)
+    clusterer.add_data(mapped_features.numpy())
+    clusters = clusterer.fit()
+    cluster_names = [f'cluster_{label}' for label in clusters]
+    cluster_eval = ClusterEvalIoU(clusters, labels.numpy())
+    print(f'avg precision:\n {cluster_eval.precision}, \n avg recall: \n{cluster_eval.recall}')
+    print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
+    fig = px.scatter_3d(x=mapped_features[:,0], y=mapped_features[:,1], z=mapped_features[:,2], color=cluster_names)
+    fig.show()
 
 

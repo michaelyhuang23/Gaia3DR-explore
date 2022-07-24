@@ -53,45 +53,45 @@ sns.scatterplot(data=df, ax=axes[1,2], x='vxstar', y='vphistar')
 plt.show()
 
 def compute_distance(model, dataset, sample_size):
-	dist = np.zeros((sample_size, sample_size))
-	for i in range(sample_size):
-		for j in range(sample_size):
-			dist[i, j] = model(dataset.features[i:i+1], dataset.features[j:j+1])
-	return dist
+    dist = np.zeros((sample_size, sample_size))
+    for i in range(sample_size):
+        for j in range(sample_size):
+            dist[i, j] = model(dataset.features[i:i+1], dataset.features[j:j+1])
+    return dist
 
 colors = ['#%06X' % randint(0, 0xFFFFFF) for i in range(27)]
 
 
 with torch.no_grad():
-	model = torch.load(f'weights/model_contrastive_64_64_64_epoch{79}.pth')
-	model.eval()
-	model.config(False)
+    model = torch.load(f'weights/model_contrastive_64_64_64_epoch{79}.pth')
+    model.eval()
+    model.config(False)
 
-	dist = compute_distance(model, dataset, sample_size)
+    dist = compute_distance(model, dataset, sample_size)
 
-	#clusterer = C_HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
-	clusterer = C_Spectral(n_components=4, assign_labels='discretize')
-	clusterer.add_data(2-dist)
-	clusters = clusterer.fit()
+    #clusterer = C_HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1, cluster_selection_method='leaf', cluster_selection_epsilon=0.01)
+    clusterer = C_Spectral(n_components=4, assign_labels='discretize')
+    clusterer.add_data(2-dist)
+    clusters = clusterer.fit()
 
-	cluster_names = [f'cluster_{label}' for label in clusters]
+    cluster_names = [f'cluster_{label}' for label in clusters]
 
-	connectivity = UnionFind(dist.shape[0])
-	net = Network()
-	for i in range(len(dataset)):
-		lab_cluster = int(clusters[i])
-		net.add_node(i, label=lab_cluster, color=colors[lab_cluster], title=str(lab_cluster))
-	edges = []
-	for i in range(sample_size):
-		for j in range(i+1, sample_size):
-			edges.append((dist[i,j]+dist[j,i], i, j))
-	edges.sort()
-	for d, i, j in edges:
-		if connectivity.connect(i,j) : continue
-		connectivity.join(i,j)
-		net.add_edge(i, j, weight=2-dist[i, j]-dist[j, i], value=2-dist[i, j]-dist[j, i], title=str(np.round(2-dist[i, j]-dist[j, i],1)))
-	net.toggle_physics(True)
-	net.show('cluster_graph.html')
+    connectivity = UnionFind(dist.shape[0])
+    net = Network()
+    for i in range(len(dataset)):
+        lab_cluster = int(clusters[i])
+        net.add_node(i, label=lab_cluster, color=colors[lab_cluster], title=str(lab_cluster))
+    edges = []
+    for i in range(sample_size):
+        for j in range(i+1, sample_size):
+            edges.append((dist[i,j]+dist[j,i], i, j))
+    edges.sort()
+    for d, i, j in edges:
+        if connectivity.connect(i,j) : continue
+        connectivity.join(i,j)
+        net.add_edge(i, j, weight=2-dist[i, j]-dist[j, i], value=2-dist[i, j]-dist[j, i], title=str(np.round(2-dist[i, j]-dist[j, i],1)))
+    net.toggle_physics(True)
+    net.show('cluster_graph.html')
 
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 clusters_names = [f'cluster {label}' for label in clusters]
