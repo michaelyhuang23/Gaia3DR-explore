@@ -22,9 +22,9 @@ class Clusterer:
         pass
 
 class C_Spectral(Clusterer):
-    def __init__(self, n_components=8, affinity='precomputed', assign_labels='discretize'):
+    def __init__(self, n_components=8, affinity='precomputed', assign_labels='discretize', n_neighbors=10):
         super().__init__()
-        self.cluster = SpectralClustering(n_components, affinity=affinity, assign_labels=assign_labels)
+        self.cluster = SpectralClustering(n_components, affinity=affinity, assign_labels=assign_labels, n_neighbors=n_neighbors)
 
     def config(self, cluster_info=None):
         pass

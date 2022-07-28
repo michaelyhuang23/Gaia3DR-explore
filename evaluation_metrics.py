@@ -12,7 +12,6 @@ class Purity:
     def __call__(self):
         return self.purity
 
-
 class ClassificationAcc:
     def __init__(self, preds, labels, num_classes):
         super().__init__()
@@ -43,7 +42,6 @@ class ClassificationAcc:
     def __call__(self):
         return self.avg_precision, self.avg_recall
 
-
 class ClusterEvalIoU:
     def __init__(self, preds, labels, IoU_thres=0.5):
         super().__init__()
@@ -73,7 +71,6 @@ class ClusterEvalIoU:
     def __call__(self):
         return self.precision, self.recall
 
-
 class ClusterEvalMode:
     def __init__(self, preds, labels):
         super().__init__()
@@ -102,6 +99,34 @@ class ClusterEvalMode:
         return self.precision, self.recall
 
 
+class ClusterEvalModeSoft:
+    def __init__(self, preds, labels):
+        super().__init__()
+        self.preds = preds
+        self.labels = labels
+
+        unique_labels = Counter(list(self.labels))
+        unique_preds_c = self.preds.shape[-1]
+
+        self.TP = 0
+        for cluster_id in unique_labels.keys():
+            point_ids = np.argwhere(self.labels == cluster_id)[:,0]
+            ecounts = np.sum(self.preds[point_ids], axis=0)
+            mode_pred = np.argmax(ecounts)
+            ecounts = np.bincount(self.labels, self.preds[:,mode_pred])
+            mode_label = np.argmax(ecounts)
+            if mode_pred>-1 and mode_label>-1 and mode_label == cluster_id:
+                self.TP += 1
+
+        self.P = unique_preds_c
+        self.T = len(unique_labels)
+        self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
+        self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
+
+    def __call__(self):
+        return self.precision, self.recall
+
 class ClusterEvalModeC:
     def __init__(self, preds, labels):
         super().__init__()
@@ -124,10 +149,77 @@ class ClusterEvalModeC:
     def __call__(self):
         return self.recall_C
 
+class ClusterEvalModeCSoft:
+    def __init__(self, preds, labels):
+        super().__init__()
+        self.preds = preds
+        self.labels = labels
+
+        unique_labels = set(list(self.labels))
+
+        self.TP_C = 0
+        for cluster_id in unique_labels:
+            point_ids = np.argwhere(self.labels == cluster_id)[:,0]
+            ecounts = np.sum(self.preds[point_ids], axis=0)
+            mode_pred = np.argmax(ecounts)
+            count_pred = ecounts[mode_pred]
+            ecounts = np.bincount(self.labels, self.preds[:,mode_pred])
+            mode_label = np.argmax(ecounts)
+            count_label = ecounts[mode_label]
+            if mode_pred>-1 and mode_label>-1 and mode_label == cluster_id:
+                assert abs(count_label-count_pred)<0.1
+                self.TP_C += count_label
+
+        self.recall_C = self.TP_C / len(self.labels)
+
+    def __call__(self):
+        return self.recall_C
+
+class ClusterEvalSoft:
+    def __init__(self, preds, labels):
+        super().__init__()
+        self.preds = preds
+        self.labels = labels
+        
+        unique_labels = np.unique(self.labels)
+        reverse_map = {label:i for i,label in enumerate(unique_labels)}
+        self.labels = np.array([reverse_map[label] for label in self.labels])
+        c_count = np.max(self.labels)+1
+
+        C = np.zeros((len(self.labels), c_count))
+        ids = np.arange(len(self.labels))
+        C[ids, self.labels[ids]] = 1
+
+        SP = np.log(self.preds + 0.0001)
+        SN = np.log(1.0001 - self.preds)
+
+        SS = np.matmul(np.transpose(C), SP) + np.matmul(np.transpose(1-C), SN)
+        column_modes = np.argmax(SS, axis=-1)
+        row_modes = np.argmax(SS, axis=0)
+        rows = np.arange(SS.shape[0])
+        chosen_rows = rows[row_modes[column_modes[rows]] == rows]
+        print(chosen_rows)
+        print(column_modes[chosen_rows])
+
+        self.TP = len(chosen_rows)
+        self.P = SS.shape[-1]
+        self.T = SS.shape[0]
+        self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
+        self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
+        self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
+
+    def __call__(self):
+        return self.precision, self.recall
+
 class ClusterEvalAll:
     def __init__(self, preds, labels):
         super().__init__()
         self.results = {}
+        if len(preds.shape)>1 :
+            preds_ = preds
+            preds = np.argmax(preds, axis=-1)
+        else:
+            preds_ = None
         IoU = ClusterEvalIoU(preds, labels, IoU_thres=0.5)
         self.results['IoU_TP'] = IoU.TP
         self.results['IoU_T'] = IoU.T
@@ -156,6 +248,27 @@ class ClusterEvalAll:
 
         ARand = sklearn.metrics.adjusted_rand_score(labels, preds)
         self.results['ARand'] = ARand
+
+        if preds_ is not None:
+            ModeSoft = ClusterEvalModeSoft(preds_, labels)
+            self.results['ModeSoft_TP'] = ModeSoft.TP
+            self.results['ModeSoft_T'] = ModeSoft.T
+            self.results['ModeSoft_P'] = ModeSoft.P
+            self.results['ModeSoft_precision'] = ModeSoft.precision
+            self.results['ModeSoft_recall'] = ModeSoft.recall
+            self.results['ModeSoft_F1'] = ModeSoft.F1
+
+            ModeSoftC = ClusterEvalModeCSoft(preds_, labels)
+            self.results['ModeSoft_TP_C'] = ModeSoftC.TP_C
+            self.results['ModeSoft_recall_C'] = ModeSoftC.recall_C
+
+            ModeProb = ClusterEvalSoft(preds_, labels)
+            self.results['ModeProb_TP'] = ModeProb.TP
+            self.results['ModeProb_T'] = ModeProb.T
+            self.results['ModeProb_P'] = ModeProb.P
+            self.results['ModeProb_precision'] = ModeProb.precision
+            self.results['ModeProb_recall'] = ModeProb.recall
+            self.results['ModeProb_F1'] = ModeProb.F1
 
     def __call__(self):
         return self.results

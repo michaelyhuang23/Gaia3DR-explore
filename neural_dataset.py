@@ -29,18 +29,20 @@ class ScaleTransform:
         return X * (torch.randn_like(X) * self.scale_range + 1)
 
 class ClusterDataset(Dataset):
-    def __init__(self, dataframe, features, cluster_ids=None, feature_divs=None):
+    def __init__(self, dataframe, features, cluster_ids=None, feature_norms=None, scales=None):
         super().__init__() 
-        self.standard_feature_divs = {'estar':89000, 'lzstar':2000, 'lxstar':2000, 'lystar':2000, 'jzstar':2000, 'jrstar':2000, 'eccstar':1, 'rstar':4, 'feH':1, 'mgfe':0.5, 'xstar':10, 'ystar':10, 'zstar':10, 'vxstar':200, 'vystar':200, 'vzstar':200, 'vrstar':200, 'vphistar':200, 'vrstar':200, 'vthetastar':200}
-        if feature_divs is None:
-            self.feature_divs = torch.tensor([self.standard_feature_divs[feature] for feature in features])
-        else:
-            self.feature_divs = torch.tensor([feature_divs[feature].to_numpy()[0] for feature in features])
+        self.features_subs = torch.tensor([feature_norms['mean'][feature] for feature in features])
+        self.feature_divs = torch.tensor([feature_norms['std'][feature] for feature in features])
         if isinstance(features, np.ndarray):
             self.features = torch.tensor(features).float()
         else:
             self.features = torch.tensor(dataframe[features].to_numpy()).float()
+        self.features -= self.features_subs[None,...]
         self.features /= self.feature_divs[None,...]
+
+        if isinstance(scales, np.ndarray):
+            self.features *= torch.tensor(scales)[None,...]
+
         if cluster_ids is None:
             self.labels = None
         elif isinstance(cluster_ids, str):
@@ -56,7 +58,7 @@ class ClusterDataset(Dataset):
             if self.labels[i].item() not in self.clusters:
                 self.clusters[self.labels[i].item()] = []
             self.clusters[self.labels[i].item()].append(i)
-            
+
         assert self.labels is None or len(self.labels) == self.features.shape[0]
 
     def cluster_transform(self, transforms=None):
@@ -151,7 +153,7 @@ class ContrastDataset(Dataset):
 
 class GraphDataset(ClusterDataset):
     def initialize(self):
-        assert self.knn+1 < self.features.shape[0]/2
+        # assert self.knn+1 < self.features.shape[0]/2
         nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
         distances, y_indices = nbrs.kneighbors(self.features)
         print('knn finished')
@@ -161,16 +163,38 @@ class GraphDataset(ClusterDataset):
         indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
         indices = np.unique(indices, axis=-1)
         counts = np.bincount(indices.flatten()) // 2
-        weights = np.ones((indices.shape[-1])) / np.sqrt(counts[indices[0]] * counts[indices[1]])
+        weights = np.ones((indices.shape[-1])) #
+        if self.normalize:
+            weights /= np.sqrt(counts[indices[0]] * counts[indices[1]])
+        self.D = torch.tensor(counts)
         self.A = torch.sparse_coo_tensor(indices, weights, (len(self.labels), len(self.labels))).float().coalesce()
         if self.labels is None:
             self.C = None
         else:
             self.C = self.labels[indices[0]] != self.labels[indices[1]]
 
-    def __init__(self, dataframe, features, cluster_ids=None, knn=5, feature_divs=None):
-        super().__init__(dataframe, features, cluster_ids, feature_divs)
+    def initialize_dense(self, to_dense=False):
+        self.D = torch.ones((len(self.labels))) * (len(self.labels)-1)
+        self.A = torch.ones((len(self.labels), len(self.labels)))
+        if self.normalize:
+            self.A /= (len(self.labels)-1)
+        self.A = self.A.to_sparse()
+        if self.labels is None:
+            self.C = None
+        else:
+            self.C = self.labels[self.A.indices()[0]] != self.labels[self.A.indices()[1]]
+        if to_dense:
+            self.A = self.A.coalesce().to_dense()
+
+    def __init__(self, dataframe, features, cluster_ids=None, knn=5, normalize=True, feature_norms=None, scales=None, discretize=False):
+        super().__init__(dataframe, features, cluster_ids, feature_norms, scales)
         self.knn = knn
+        self.normalize = normalize
+        if discretize:
+            unique_labels = np.unique(self.labels.numpy())
+            reverse_map = {label:i for i,label in enumerate(unique_labels)}
+            self.labels = torch.tensor([reverse_map[label] for label in self.labels.numpy()])
+            self.count_labels = torch.max(self.labels)+1
 
     def __len__(self):
         return 1

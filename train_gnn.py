@@ -16,8 +16,9 @@ from cluster_analysis import C_HDBSCAN, C_GaussianMixture
 
 
 if __name__ == '__main__':
+    np.random.seed(0)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    EPOCH = 400
+    EPOCH = 4000
     data_root = 'data/simulation'
     dataset_name = 'm12f_cluster_data_large_cluster_v2'
     dataset_path = os.path.join(data_root, dataset_name)
@@ -32,12 +33,12 @@ if __name__ == '__main__':
     df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
     df_test_std = pd.read_csv(test_dataset_path+'_std.csv')
 
-    sample_size = 10000
+    sample_size = 1000
     sample_size = min(sample_size, len(df_))
     sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
     df = df_.iloc[sample_ids].copy()
 
-    sample_size = 10000
+    sample_size = 1000
     sample_size = min(sample_size, len(df_test))
     sample_ids = np.random.choice(len(df_test), min(len(df_test), sample_size), replace=False)
     df_test = df_test.iloc[sample_ids].copy()
@@ -45,13 +46,13 @@ if __name__ == '__main__':
     print(df.columns)
     feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
 
-    dataset = GraphDataset(df, feature_columns, 'cluster_id', 10, feature_divs=df_std)
+    dataset = GraphDataset(df, feature_columns, 'cluster_id', 50, feature_divs=df_std)
     dataset.initialize()
-    test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 10, feature_divs=df_test_std)
+    test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 50, feature_divs=df_test_std)
     test_dataset.initialize()
 
 
-    model = GCNEdge(len(feature_columns), graph_layer_sizes=[32,32], linear_layer_sizes=[], similar_weight=1, device=device)
+    model = GCNEdgeDot(len(feature_columns), graph_layer_sizes=[64,64,64], similar_weight=1, device=device)
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
     def train_epoch_step(epoch, dataset, model, optimizer, device):
@@ -68,7 +69,7 @@ if __name__ == '__main__':
 
 
     for epoch in range(EPOCH):
-        if (epoch) % 10 == 0:      
+        if (epoch) % 50 == 0:      
             with torch.no_grad():
                 model.config(False)
                 model.eval()
@@ -78,7 +79,8 @@ if __name__ == '__main__':
                 SX = model(X.to(device))
                 preds = np.rint(SX.numpy()).astype(np.int32)
                 metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
-                print(f'train acc: {metrics.precision}')
+                print(f'train acc: {metrics.precision}\n{metrics.count_matrix}')
+                # print(np.mean(SX.numpy()), np.std(SX.numpy()))
 
                 model.config(False)
                 model.eval()
@@ -88,17 +90,17 @@ if __name__ == '__main__':
                 SX = model(X.to(device))
                 preds = np.rint(SX.numpy()).astype(np.int32)
                 metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
-                print(f'test acc: {metrics.precision}')
+                print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
+                # print(np.mean(SX.numpy()), np.std(SX.numpy()))
+                torch.save(model, f'weights/model_gnn_edgedot_64_64_64_epoch{epoch}.pth')
 
-                torch.save(model, f'weights/model_gnn_edge_32_32__epoch{epoch}.pth')
-
-                sample_size = 10000
+                sample_size = 1000
                 sample_size = min(sample_size, len(df_))
                 sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
                 df = df_.iloc[sample_ids].copy()
-                dataset = GraphDataset(df, feature_columns, 'cluster_id', 10, feature_divs=df_std)
+                dataset = GraphDataset(df, feature_columns, 'cluster_id', 50, feature_divs=df_std)
                 # dataset.cluster_transform(transforms=[GlobalJitterTransform(0.2), GlobalScaleTransform(0.5)])
-                dataset.global_transform(transforms=[JitterTransform(0.1)])
+                dataset.global_transform(transforms=[JitterTransform(0.05)])
                 dataset.initialize()
 
         loss = train_epoch_step(epoch, dataset, model, optimizer, device)

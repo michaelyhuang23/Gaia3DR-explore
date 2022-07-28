@@ -21,9 +21,9 @@ from utils import cart2spherical, UnionFind
 # mass of host galaxy for normalization? Energy, action scales with mass of host galaxy
 
 device = 'cpu'
-sample_size = 10000
+sample_size = 1000
 data_root = 'data/simulation'
-dataset_name = 'm12i_cluster_data_large_cluster_v2'
+dataset_name = 'm12f_cluster_data_large_cluster_v2'
 dataset_path = os.path.join(data_root, dataset_name)
 
 #23, 2, 26, 4, 1, 13, 21, 7, 5, 12, 14, 19
@@ -37,15 +37,22 @@ easy_large_clusters = [22, 15, 18, 20, 3, 8]
 def evaluate_once(model_name, n_components):
     global device, sample_size, data_root, dataset_name, dataset_path, easy_large_clusters, easy_mid_clusters, easy_small_clusters
     df = pd.read_hdf(dataset_path+'.h5', key='star')
-    df_std = pd.read_csv(dataset_path+'_std.csv')
+    with open(dataset_path+'_norm.json', 'r') as f:
+        df_norm = json.load(f)
 
+    df_norm['mean']['lzstar'] = 0
+    df_norm['mean']['lxstar'] = 0
+    df_norm['mean']['lystar'] = 0
+    df_norm['mean']['jzstar'] = 0
+    df_norm['mean']['jrstar'] = 0
 
-    feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    #feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
     sample_size = min(len(df), sample_size)
     sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
     df_trim = df.iloc[sample_ids].copy()
     df = df_trim
-    dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 10, feature_divs=df_std)
+    dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm)
     dataset.initialize()
     labels = dataset.labels
 
@@ -54,30 +61,42 @@ def evaluate_once(model_name, n_components):
         model.config(False)
         model.eval()
         A, X, C = dataset[0]
-        model.add_graph(A.to(device))
-        SX = model(X.to(device))
+        D = dataset.D
+        A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
+        model.add_graph(D,A,X)
+        SX = model(X)
         dist = np.ones((len(X), len(X)))
         dist[A.indices()[0].numpy(), A.indices()[1].numpy()] = SX
-        dist = np.minimum(dist, np.transpose(dist))
+        dist = (dist + np.transpose(dist))/2
 
-        clusterer = C_Spectral(n_components=n_components, assign_labels='kmeans')
+        clusterer = C_Spectral(n_components=n_components, assign_labels='kmeans', affinity='precomputed')
         clusterer.add_data(1-dist)
         clusters = clusterer.fit()
+        x = clusterer.cluster.affinity_matrix_[np.nonzero(clusterer.cluster.affinity_matrix_)]
+        print(np.mean(x), np.std(x))
 
     cluster_eval = ClusterEvalAll(clusters, labels.numpy())
     print(cluster_eval())
     return cluster_eval()
 
 
-model_name_simple = f'model_gnn_edge_32_32__epoch{390}.pth'
+model_name_simple = f'm12i_model_32_32_epoch{400}.pth'
 
-for n_components in [30,40,50,80,120,200]:
-    t_results = []
-    for i in range(60):
-        results = evaluate_once(model_name_simple, n_components)
-        t_results.append(results)
+# for n_components in [10,20,30,40,50,80,120,200]:
+#     t_results = []
+#     for i in range(10):
+#         results = evaluate_once(model_name_simple, n_components)
+#         t_results.append(results)
 
-    results = ClusterEvalAll.aggregate(t_results)
-    print(results)
-    with open(f'results/gnn_edge_spectral_1000_{n_components}.json', 'w') as f:
-        json.dump(results, f)
+#     results = ClusterEvalAll.aggregate(t_results)
+#     print(results)
+#     with open(f'results/gnn_edge_spectral_1000_{n_components}.json', 'w') as f:
+#         json.dump(results, f)
+
+t_results = []
+for i in range(10):
+    results = evaluate_once(model_name_simple, 30)
+    t_results.append(results)
+
+results = ClusterEvalAll.aggregate(t_results)
+print(results)
