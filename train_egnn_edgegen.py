@@ -73,6 +73,7 @@ if __name__ == '__main__':
     test_dataset.initialize_dense(to_dense=True)
 
     model = GCNEdgeBasedEdgeGen(len(feature_columns), num_cluster=30, auxiliary=1, regularizer=0.0001, device=device)
+    model.to(device)
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
     def train_epoch_step(epoch, dataset, model, optimizer, device):
@@ -83,6 +84,7 @@ if __name__ == '__main__':
         D = dataset.D
         A,X,D = A.to(device),X.to(device),D.to(device)
         C = dataset.labels[None,...].repeat(n, 1) != dataset.labels[...,None].repeat(1, n)
+        C = C.to(device)
         model.add_graph(D,A,X)
         model.add_connectivity(C)
         loss = model(X)
@@ -102,7 +104,7 @@ if __name__ == '__main__':
                 D = dataset.D
                 A,X,D = A.to(device),X.to(device),D.to(device)
                 model.add_graph(D,A,X)
-                FX = model(X).detach().numpy()
+                FX = model(X).detach().cpu().numpy()
                 metrics = ClusterEvalAll(FX, dataset.labels.numpy())
                 print(metrics())
 
@@ -110,6 +112,7 @@ if __name__ == '__main__':
                 model.train()
                 model.add_graph(D,A,X)
                 C = dataset.labels[None,...].repeat(n, 1) != dataset.labels[...,None].repeat(1, n)
+                C = C.to(device)
                 model.add_connectivity(C)
                 loss = model(X)
                 print(f'train loss: {loss}')
@@ -123,7 +126,7 @@ if __name__ == '__main__':
                 D = test_dataset.D
                 A,X,D = A.to(device),X.to(device),D.to(device)
                 model.add_graph(D,A,X)
-                FX = model(X).detach().numpy()
+                FX = model(X).detach().cpu().numpy()
                 metrics = ClusterEvalAll(FX, test_dataset.labels.numpy())
                 print(metrics())
 
@@ -131,6 +134,7 @@ if __name__ == '__main__':
                 model.train()
                 model.add_graph(D,A,X)
                 C = test_dataset.labels[None,...].repeat(n, 1) != test_dataset.labels[...,None].repeat(1, n)
+                C = C.to(device)
                 model.add_connectivity(C)
                 loss = model(X)
                 print(f'test loss: {loss}')
