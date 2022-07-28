@@ -295,15 +295,15 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         if A.is_sparse:
             X1, X2 = X[A.indices()[0]], X[A.indices()[1]]
             weights = torch.abs(X1-X2)
-            self.A = torch.sparse_coo_tensor(A.indices(), weights, (*A.shape, weights.shape[-1])).coalesce().float()
+            self.A = torch.sparse_coo_tensor(A.indices(), weights, (*A.shape, weights.shape[-1]), device=self.device).coalesce().float()
         else:
             n = X.shape[0]
             X1, X2 = X[None,...].repeat(n, 1, 1), X[:,None,:].repeat(1, n, 1)
             self.A = torch.abs(X1 - X2) # change to decreasing function
 
     def forward(self, X):
-        X = torch.zeros_like(X)
-        A = self.A.clone()
+        X = torch.zeros_like(X, device=self.device)
+        A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)
         A = self.convE1(A, X)
@@ -323,7 +323,7 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         if self.classify:
             corr = torch.mm(FX, torch.transpose(FX, 0, 1))
             # loss = torch.sum(self.C.float() * corr / torch.sum(self.C.float()) - (1-self.C.float()) * torch.log(1.0001 - torch.exp(-corr)) / torch.sum(1-self.C.float()))
-            loss_gen = torch.mean(- self.C.float() * torch.log(1-corr) - (1-self.C.float()) * torch.log(corr) * self.similar_weight)
+            loss_gen = torch.mean(- self.C.float() * torch.log(1.0001-corr) - (1-self.C.float()) * torch.log(corr+1.0001) * self.similar_weight)
             print(loss_gen.item(), loss_class.item()*self.auxiliary, pregularize.item()*self.regularizer)
             return loss_gen + loss_class*self.auxiliary + pregularize*self.regularizer
         else:
