@@ -190,7 +190,7 @@ class GCNEdgeBased(GNN): # non-overlapping
     def add_graph(self, D, A, X):
         self.D = D
         X1, X2 = X[A.indices()[0]], X[A.indices()[1]]
-        weights = torch.abs(X1-X2)
+        weights = torch.exp(-(X1-X2)**2)
         self.A = torch.sparse_coo_tensor(A.indices(), weights, (*A.shape, weights.shape[-1])).coalesce().float()
 
     def forward(self, X):
@@ -279,10 +279,10 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         self.device = device
         self.input_size = input_size
         self.convN1 = NodeGCNConv(input_size, input_size, 32)
-        self.dropout1 = nn.Dropout(p=0.3)
+        self.dropout1 = nn.Dropout(p=0.0)
         self.convE1 = EdgeGCNConv(32, input_size, 32)
         self.convN2 = NodeGCNConv(32, 32, 32)
-        self.dropout2 = nn.Dropout(p=0.3)
+        self.dropout2 = nn.Dropout(p=0.0)
         self.convE2 = EdgeGCNConv(32, 32, 32)
         self.convN3 = NodeGCNConv(32, 32, num_cluster, activation=False)
         self.classifier = nn.Linear(32, 1)
@@ -318,8 +318,9 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
                 raise ValueError('not fucking implemented')
         FX = self.convN3(self.D, A, X)
         FX = torch.softmax(FX, dim=-1)
-        NFX = torch.log(1-FX**2)
-        pregularize = -torch.sum(torch.log(1.0001-torch.exp(torch.sum(NFX, dim=0))), dim=0)
+        print(torch.max(FX, dim=0))
+        NFX = torch.log(1-FX**2*0.9999)
+        pregularize = -torch.sum(torch.log(1-torch.exp(torch.sum(NFX, dim=0))*0.9999), dim=0)
         if self.classify:
             corr = torch.mm(FX, torch.transpose(FX, 0, 1))
             # loss = torch.sum(self.C.float() * corr / torch.sum(self.C.float()) - (1-self.C.float()) * torch.log(1.0001 - torch.exp(-corr)) / torch.sum(1-self.C.float()))
