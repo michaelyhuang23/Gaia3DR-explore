@@ -321,14 +321,13 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         FX = torch.softmax(FX, dim=-1)
         NFX = torch.log(1-FX**2*0.9999)
         pregularize = -torch.sum(torch.log(1-torch.exp(torch.sum(NFX, dim=0))*0.9999), dim=0)
+        corr = torch.mm(FX, torch.transpose(FX, 0, 1))
         if self.classify:
-            corr = torch.mm(FX, torch.transpose(FX, 0, 1))
-            # loss = torch.sum(self.C.float() * corr / torch.sum(self.C.float()) - (1-self.C.float()) * torch.log(1.0001 - torch.exp(-corr)) / torch.sum(1-self.C.float()))
             loss_gen = torch.mean(- self.C.float() * torch.log(1-corr*0.99) - (1-self.C.float()) * torch.log(corr+0.01) * self.similar_weight)
             print(loss_gen.item(), loss_class.item()*self.auxiliary, pregularize.item()*self.regularizer)
             return loss_gen + loss_class*self.auxiliary + pregularize*self.regularizer
         else:
-            return FX
+            return FX, corr
 
 
 class GCNEdgeBasedCluster(GNN): # non-overlapping

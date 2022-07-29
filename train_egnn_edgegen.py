@@ -72,7 +72,7 @@ if __name__ == '__main__':
     test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_test_norm, scales=feature_weights)
     test_dataset.initialize_dense(to_dense=True)
 
-    model = GCNEdgeBasedEdgeGen(len(feature_columns), num_cluster=30, auxiliary=0.7, regularizer=0.001, device=device)
+    model = GCNEdgeBasedEdgeGen(len(feature_columns), num_cluster=30, auxiliary=0, regularizer=0.001, device=device)
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
@@ -104,10 +104,18 @@ if __name__ == '__main__':
                 n = X.shape[0]
                 D = dataset.D
                 A,X,D = A.to(device),X.to(device),D.to(device)
+                C = dataset.labels[None,...].repeat(n, 1) != dataset.labels[...,None].repeat(1, n)
                 model.add_graph(D,A,X)
-                FX = model(X).detach().cpu().numpy()
+                FX, corr = model(X)
+                FX = FX.detach().cpu().numpy()
+                corr = corr.detach().cpu().numpy()
                 metrics = ClusterEvalAll(FX, dataset.labels.numpy())
                 print(metrics())
+
+                preds = np.rint(corr).astype(np.int32).flatten()
+                class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32).flatten(), 2)
+                print(f'train acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
+                writer.add_scalar('Acc/train', class_metrics.precision, epoch)
 
                 model.config(True)
                 model.train()
@@ -126,10 +134,18 @@ if __name__ == '__main__':
                 n = X.shape[0]
                 D = test_dataset.D
                 A,X,D = A.to(device),X.to(device),D.to(device)
+                C = test_dataset.labels[None,...].repeat(n, 1) != test_dataset.labels[...,None].repeat(1, n)
                 model.add_graph(D,A,X)
-                FX = model(X).detach().cpu().numpy()
+                FX, corr = model(X)
+                FX = FX.detach().cpu().numpy()
+                corr = corr.detach().cpu().numpy()
                 metrics = ClusterEvalAll(FX, test_dataset.labels.numpy())
                 print(metrics())
+
+                preds = np.rint(corr).astype(np.int32).flatten()
+                class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32).flatten(), 2)
+                print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
+                writer.add_scalar('Acc/test', class_metrics.precision, epoch)
 
                 model.config(True)
                 model.train()
