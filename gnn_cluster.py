@@ -278,6 +278,7 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         super().__init__()
         self.device = device
         self.input_size = input_size
+        self.summarizer = nn.Linear(input_size, 1)
         self.convN1 = NodeGCNConv(input_size, input_size, 32)
         self.dropout1 = nn.Dropout(p=0.0)
         self.convE1 = EdgeGCNConv(32, input_size, 32)
@@ -302,7 +303,9 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
             self.A = torch.abs(X1 - X2) # change to decreasing function
 
     def forward(self, X):
-        X = torch.zeros_like(X, device=self.device)
+        nX = torch.zeros_like(X, device=self.device)
+        nX[:,0] = self.summarizer(X)[:,0]
+        X = nX
         A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)
