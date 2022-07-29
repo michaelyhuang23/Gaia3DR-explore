@@ -306,7 +306,7 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
 
     def forward(self, X):
         X = torch.zeros_like(X, device=self.device)
-        X = PositionalEncoding(X.shape[1], max_len=X.shape[0])(X)
+        X = PositionalEncoding(X.shape[1], max_len=X.shape[0], device=self.device)(X)
         A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)
