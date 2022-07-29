@@ -323,7 +323,7 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         pregularize = -torch.sum(torch.log(1-torch.exp(torch.sum(NFX, dim=0))*0.9999), dim=0)
         corr = 1-torch.mm(FX, torch.transpose(FX, 0, 1))
         if self.classify:
-            loss_gen = F.binary_cross_entropy(corr.flatten(), self.C.flatten())
+            loss_gen = F.binary_cross_entropy(corr.flatten(), self.C.flatten().float())
             print(loss_gen.item(), loss_class.item()*self.auxiliary, pregularize.item()*self.regularizer)
             return loss_gen + loss_class*self.auxiliary + pregularize*self.regularizer
         else:
