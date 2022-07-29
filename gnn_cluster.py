@@ -313,18 +313,18 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         if self.classify:
             if not A.is_sparse:
                 SA = torch.sigmoid(self.classifier(A))[:,:,0]
+                SA = torch.clip(SA, 0.001, 0.99)
                 loss_class = F.binary_cross_entropy(SA, self.C.float())
             else:
                 raise ValueError('not fucking implemented')
         FX = self.convN3(self.D, A, X)
         FX = torch.softmax(FX, dim=-1)
-        print(torch.max(FX, dim=0))
         NFX = torch.log(1-FX**2*0.9999)
         pregularize = -torch.sum(torch.log(1-torch.exp(torch.sum(NFX, dim=0))*0.9999), dim=0)
         if self.classify:
             corr = torch.mm(FX, torch.transpose(FX, 0, 1))
             # loss = torch.sum(self.C.float() * corr / torch.sum(self.C.float()) - (1-self.C.float()) * torch.log(1.0001 - torch.exp(-corr)) / torch.sum(1-self.C.float()))
-            loss_gen = torch.mean(- self.C.float() * torch.log(1.0001-corr) - (1-self.C.float()) * torch.log(corr+1.0001) * self.similar_weight)
+            loss_gen = torch.mean(- self.C.float() * torch.log(1-corr*0.99) - (1-self.C.float()) * torch.log(corr+0.01) * self.similar_weight)
             print(loss_gen.item(), loss_class.item()*self.auxiliary, pregularize.item()*self.regularizer)
             return loss_gen + loss_class*self.auxiliary + pregularize*self.regularizer
         else:
