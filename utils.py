@@ -24,6 +24,21 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
 
+class LabelEncoding(nn.Module):
+    def __init__(self, d_model: int, max_len: int = 5000, device='cpu'):
+        super().__init__()
+        min_F, max_F = 1/d_model, 1/3
+        W = torch.linspace(min_F, max_F, max_len) * 2 * math.pi
+        positions = torch.arange(d_model)
+        self.encoding = torch.cos(W[:,None] * positions[None,:])
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor, shape [seq_len, embedding_dim]
+        """
+        return x + self.encoding[:x.size(0)]
+
 def cart2spherical(x, y, z):
     r = np.linalg.norm([x,y,z], axis=0)
     rho = np.linalg.norm([x,y], axis=0)

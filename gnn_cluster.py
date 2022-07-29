@@ -2,7 +2,7 @@ from torch import nn
 import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
-from utils import PositionalEncoding
+from utils import LabelEncoding
 
 
 class GCNConv(nn.Module):
@@ -306,7 +306,8 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
 
     def forward(self, X):
         X = torch.zeros_like(X, device=self.device)
-        X = PositionalEncoding(X.shape[1], max_len=X.shape[0], device=self.device)(X)
+        perm = torch.randperm(X.shape[0])
+        X = LabelEncoding(X.shape[1], max_len=X.shape[0], device=self.device)(X)[perm, :]
         A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)

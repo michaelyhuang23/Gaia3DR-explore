@@ -186,6 +186,8 @@ class GraphDataset(ClusterDataset):
         if to_dense:
             self.A = self.A.coalesce().to_dense()
 
+    
+
     def __init__(self, dataframe, features, cluster_ids=None, knn=5, normalize=True, feature_norms=None, scales=None, discretize=False):
         super().__init__(dataframe, features, cluster_ids, feature_norms, scales)
         self.knn = knn

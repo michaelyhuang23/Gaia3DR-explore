@@ -43,21 +43,24 @@ def get_dataset(df, df_norm, sample_size, feature_columns):
     sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
     df_trim = df.iloc[sample_ids].copy()
     dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm)
-    dataset.initialize_dense()
+    dataset.initialize_dense(to_dense=False)
     return dataset
 
 def compute_distance(dataset, model_name):
     with torch.no_grad():
-        model = torch.load(os.path.join('weights',model_name))
+        model = torch.load(os.path.join('weights',model_name),map_location=torch.device('cpu')).to(device)
+        model.device = device
         model.config(False)
         model.eval()
         A, X, C = dataset[0]
+        dA = A.coalesce().to_dense()
         D = dataset.D
-        A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
-        model.add_graph(D,A,X)
-        SX = model(X).detach()
-        print(SX.shape)
-        E = torch.sparse_coo_tensor(A.indices(), 1-SX, A.shape).coalesce()
+        A,dA,X,C,D = A.to(device),dA.to(device),X.to(device),C.to(device),D.to(device)
+        model.add_graph(D,dA,X)
+        FX, SX = model(X)
+        SX = SX.detach().to_sparse()
+        FX = FX.detach()
+        E = torch.sparse_coo_tensor(A.indices(), 1-SX.values(), A.shape).coalesce()
         D = torch.zeros((E.shape[0]))
         for i, v in zip(E.indices()[0], E.values()):
             D[i] += v
@@ -91,8 +94,8 @@ def evaluate_step(epoch, A, E, X, labels, model, device):
     print(f'metrics for epoch {epoch}:\n {metrics()}')
     return metrics()
 
-model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
-model = GCNEdge2Cluster(len(feature_columns), num_cluster=200, graph_layer_sizes=[64], regularizer=0.00001, device=device)
+model_name_simple = f'm12i_model_edgegen_32_32_epoch{1400}.pth'
+model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00001, device=device)
 optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
 t_results = []
