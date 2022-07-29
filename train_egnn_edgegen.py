@@ -96,7 +96,7 @@ if __name__ == '__main__':
 
 
     for epoch in range(EPOCH):
-        if (epoch) % 10 == 0:      
+        if (epoch) % 100 == 0:      
             with torch.no_grad():
                 model.config(False)
                 model.eval()
@@ -160,13 +160,14 @@ if __name__ == '__main__':
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
                 torch.save(model, f'weights/m12i_model_edgegen_32_32_epoch{epoch}.pth')
 
-                sample_size = 1000
-                sample_size = min(sample_size, len(df_))
-                sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
-                df = df_.iloc[sample_ids].copy()
-                dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm, scales=feature_weights)
-                # dataset.global_transform(transforms=[JitterTransform(0.1)])
-                dataset.initialize_dense(to_dense=True)
+        if (epoch) % 10 == 0: 
+            sample_size = 1000
+            sample_size = min(sample_size, len(df_))
+            sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
+            df = df_.iloc[sample_ids].copy()
+            dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm, scales=feature_weights)
+            # dataset.global_transform(transforms=[JitterTransform(0.1)])
+            dataset.initialize_dense(to_dense=True)
 
         loss = train_epoch_step(epoch, dataset, model, optimizer, device)
 
