@@ -48,16 +48,22 @@ def get_dataset(df, df_norm, sample_size, feature_columns):
 
 def compute_distance(dataset, model_name):
     with torch.no_grad():
-        model = torch.load(os.path.join('weights',model_name))
+        model = torch.load(os.path.join('weights',model_name), map_location='cpu')
+        model.device = device
         model.config(False)
         model.eval()
         A, X, C = dataset[0]
         D = dataset.D
         A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
         model.add_graph(D,A,X)
-        SX = model(X).detach()
-        print(SX.shape)
-        E = torch.sparse_coo_tensor(A.indices(), 1-SX, A.shape).coalesce()
+        SX = model(X)
+        SX = SX.detach()
+        print(SX.shape,C.shape)
+        preds = np.rint(SX.numpy()).astype(np.int32).flatten()
+        class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
+        print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
+
+        E = torch.sparse_coo_tensor(A.indices(), 1-SX.flatten(), A.shape).coalesce()
         D = torch.zeros((E.shape[0]))
         for i, v in zip(E.indices()[0], E.values()):
             D[i] += v
@@ -81,14 +87,14 @@ def train_epoch_step(epoch, A, E, X, model, optimizer, device):
     return loss.item()
 
 
-model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
+model_name_simple = f'm12i_model_edgegen_32_32_epoch{1450}.pth'
 
 t_results = []
 for i in range(10):
     dataset = get_dataset(df, df_norm, sample_size, feature_columns)
     A, E, X = compute_distance(dataset, model_name_simple)
 
-    clusterer = C_Spectral(n_components=50, assign_labels='kmeans')
+    clusterer = C_Spectral(n_components=30, assign_labels='kmeans')
     dist = E.to_dense().numpy()
     dist = (dist + np.transpose(dist))/2
     clusterer.add_data(dist)
