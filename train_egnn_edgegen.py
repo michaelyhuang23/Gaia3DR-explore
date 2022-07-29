@@ -72,7 +72,7 @@ if __name__ == '__main__':
     test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_test_norm, scales=feature_weights)
     test_dataset.initialize_dense(to_dense=True)
 
-    model = GCNEdgeBasedEdgeGen(len(feature_columns), num_cluster=30, auxiliary=0.7, regularizer=0.1, device=device)
+    model = GCNEdgeBasedEdgeGen(len(feature_columns), num_cluster=30, auxiliary=0.7, regularizer=0.001, device=device)
     model.to(device)
 
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)

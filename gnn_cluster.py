@@ -279,10 +279,10 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         self.device = device
         self.input_size = input_size
         self.convN1 = NodeGCNConv(input_size, input_size, 32)
-        self.dropout1 = nn.Dropout(p=0.3)
+        self.dropout1 = nn.Dropout(p=0.0)
         self.convE1 = EdgeGCNConv(32, input_size, 32)
         self.convN2 = NodeGCNConv(32, 32, 32)
-        self.dropout2 = nn.Dropout(p=0.3)
+        self.dropout2 = nn.Dropout(p=0.0)
         self.convE2 = EdgeGCNConv(32, 32, 32)
         self.convN3 = NodeGCNConv(32, 32, num_cluster, activation=False)
         self.classifier = nn.Linear(32, 1)
@@ -313,17 +313,18 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         if self.classify:
             if not A.is_sparse:
                 SA = torch.sigmoid(self.classifier(A))[:,:,0]
+                SA = torch.clip(SA, 0.001, 0.99)
                 loss_class = F.binary_cross_entropy(SA, self.C.float())
             else:
                 raise ValueError('not fucking implemented')
         FX = self.convN3(self.D, A, X)
         FX = torch.softmax(FX, dim=-1)
-        NFX = torch.log(1-FX**2)
-        pregularize = -torch.sum(torch.log(1.0001-torch.exp(torch.sum(NFX, dim=0))), dim=0)
+        NFX = torch.log(1-FX**2*0.99)
+        pregularize = -torch.sum(torch.log(1-torch.exp(torch.sum(NFX, dim=0))*0.99), dim=0)
         if self.classify:
             corr = torch.mm(FX, torch.transpose(FX, 0, 1))
             # loss = torch.sum(self.C.float() * corr / torch.sum(self.C.float()) - (1-self.C.float()) * torch.log(1.0001 - torch.exp(-corr)) / torch.sum(1-self.C.float()))
-            loss_gen = torch.mean(- self.C.float() * torch.log(1.0001-corr) - (1-self.C.float()) * torch.log(corr+1.0001) * self.similar_weight)
+            loss_gen = torch.mean(- self.C.float() * torch.log(1-corr*0.99) - (1-self.C.float()) * torch.log(corr+0.01) * self.similar_weight)
             print(loss_gen.item(), loss_class.item()*self.auxiliary, pregularize.item()*self.regularizer)
             return loss_gen + loss_class*self.auxiliary + pregularize*self.regularizer
         else:
