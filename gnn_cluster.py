@@ -302,7 +302,7 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
             self.A = torch.abs(X1 - X2) # change to decreasing function
 
     def forward(self, X):
-        # X = torch.zeros_like(X, device=self.device)
+        X = torch.zeros_like(X, device=self.device)
         A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)
