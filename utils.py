@@ -28,8 +28,8 @@ class LabelEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 5000, device='cpu'):
         super().__init__()
         min_F, max_F = 1/d_model, 1/3
-        W = torch.linspace(min_F, max_F, max_len) * 2 * math.pi
-        positions = torch.arange(d_model)
+        W = torch.linspace(min_F, max_F, max_len, device=device) * 2 * math.pi
+        positions = torch.arange(d_model, device=device)
         self.encoding = torch.cos(W[:,None] * positions[None,:])
 
     def forward(self, x):
