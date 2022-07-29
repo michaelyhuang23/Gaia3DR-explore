@@ -76,6 +76,7 @@ if __name__ == '__main__':
     print(torch.mean(test_dataset.features, axis=0))
 
     model = GCNEdgeBased(len(feature_columns), similar_weight=1, device=device)
+    model.to(device)
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
     def train_epoch_step(epoch, dataset, model, optimizer, device):
@@ -103,9 +104,9 @@ if __name__ == '__main__':
                 A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
                 model.add_graph(D,A,X)
                 model.add_connectivity(C)
-                SX = model(X)
+                SX = model(X).cpu()
                 preds = np.rint(SX.numpy()).astype(np.int32)
-                metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
+                metrics = ClassificationAcc(preds, C.cpu().numpy().astype(np.int32), 2)
                 print(f'train acc: {metrics.precision}\n{metrics.count_matrix}')
                 writer.add_scalar('Acc/train', metrics.precision, epoch)
 
@@ -125,9 +126,9 @@ if __name__ == '__main__':
                 A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
                 model.add_graph(D,A,X)
                 model.add_connectivity(C)
-                SX = model(X)
+                SX = model(X).cpu()
                 preds = np.rint(SX.numpy()).astype(np.int32)
-                metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
+                metrics = ClassificationAcc(preds, C.cpu().numpy().astype(np.int32), 2)
                 print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
                 writer.add_scalar('Acc/test', metrics.precision, epoch)
 
