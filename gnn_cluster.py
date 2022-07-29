@@ -297,17 +297,17 @@ class GCNEdgeBasedEdgeGen(GNN): # non-overlapping
         self.D = D
         if A.is_sparse:
             X1, X2 = X[A.indices()[0]], X[A.indices()[1]]
-            weights = torch.abs(X1-X2)
+            weights = X1-X2
             self.A = torch.sparse_coo_tensor(A.indices(), weights, (*A.shape, weights.shape[-1]), device=self.device).coalesce().float()
         else:
             n = X.shape[0]
             X1, X2 = X[None,...].repeat(n, 1, 1), X[:,None,:].repeat(1, n, 1)
-            self.A = torch.abs(X1 - X2) # change to decreasing function
+            self.A = X1 - X2 # change to decreasing function
 
     def forward(self, X):
         X = torch.zeros_like(X, device=self.device)
-        perm = torch.randperm(X.shape[0])
-        X = LabelEncoding(X.shape[1], max_len=X.shape[0], device=self.device)(X)[perm, :]
+#        perm = torch.randperm(X.shape[0])
+#        X = LabelEncoding(X.shape[1], max_len=X.shape[0], device=self.device)(X)[perm, :]
         A = self.A.clone().to(self.device)
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)

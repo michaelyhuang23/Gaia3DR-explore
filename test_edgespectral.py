@@ -55,12 +55,14 @@ def compute_distance(dataset, model_name):
         A, X, C = dataset[0]
         D = dataset.D
         A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
+        n = X.shape[0]
+        C = dataset.labels[None,...].repeat(n, 1) != dataset.labels[...,None].repeat(1, n)
         model.add_graph(D,A,X)
-        SX = model(X)
+        FX, SX = model(X)
         SX = SX.detach()
         print(SX.shape,C.shape)
         preds = np.rint(SX.numpy()).astype(np.int32).flatten()
-        class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
+        class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32).flatten(), 2)
         print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
 
         E = torch.sparse_coo_tensor(A.indices(), 1-SX.flatten(), A.shape).coalesce()
@@ -87,7 +89,7 @@ def train_epoch_step(epoch, A, E, X, model, optimizer, device):
     return loss.item()
 
 
-model_name_simple = f'm12i_model_edgegen_32_32_epoch{1450}.pth'
+model_name_simple = f'm12i_model_edgegen_32_32_epoch{100}.pth'
 
 t_results = []
 for i in range(10):
