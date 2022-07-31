@@ -36,14 +36,15 @@ df_norm['mean']['lystar'] = 0
 df_norm['mean']['jzstar'] = 0
 df_norm['mean']['jrstar'] = 0
 
-feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+#feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
 
 def get_dataset(df, df_norm, sample_size, feature_columns):
     sample_size = min(len(df), sample_size)
     sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
     df_trim = df.iloc[sample_ids].copy()
     dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm)
-    dataset.initialize_dense(to_dense=False)
+    dataset.initialize_dense()
     return dataset
 
 def compute_distance(dataset, model_name):
@@ -53,22 +54,25 @@ def compute_distance(dataset, model_name):
         model.config(False)
         model.eval()
         A, X, C = dataset[0]
-        dA = A.coalesce().to_dense()
+        n = X.shape[0]
         D = dataset.D
-        A,dA,X,C,D = A.to(device),dA.to(device),X.to(device),C.to(device),D.to(device)
-        model.add_graph(D,dA,X)
-        FX, SX = model(X)
-        SX = SX.detach().to_sparse()
-        FX = FX.detach()
-        E = torch.sparse_coo_tensor(A.indices(), 1-SX.values(), A.shape).coalesce()
-        D = torch.zeros((E.shape[0]))
-        for i, v in zip(E.indices()[0], E.values()):
-            D[i] += v
-        for i, v in zip(E.indices()[1], E.values()):
-            D[i] += v
-        D /= 2
+        # C = dataset.labels[A.indices()[0]] != dataset.labels[A.indices()[1]]
+        A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
+        model.add_graph(D, A, X)
+        SX = model(X)
+        SX = SX.detach()
+        preds = np.rint(SX.numpy()).astype(np.int32)
+        class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
+        print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
+        SX = torch.sparse_coo_tensor(A.indices(), SX, A.shape).to_dense()
+        print(SX)
+        E = 1 - SX*0.999
+        D = (torch.sum(E, axis=0) + torch.sum(E, axis=1))/2
+        E = E.to_sparse().coalesce()
         weights = E.values() / torch.sqrt(D[E.indices()[0]] * D[E.indices()[1]])
         A = torch.sparse_coo_tensor(E.indices(), weights, E.shape).coalesce()
+        print(A)
+        print(E)
     return A, E, X
 
 def train_epoch_step(epoch, A, E, X, model, optimizer, device):
@@ -94,7 +98,8 @@ def evaluate_step(epoch, A, E, X, labels, model, device):
     print(f'metrics for epoch {epoch}:\n {metrics()}')
     return metrics()
 
-model_name_simple = f'm12i_model_edgegen_32_32_epoch{1400}.pth'
+model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
+model_name_large = f'm12i_dense_bugged_model_32_32_epoch{1500}.pth'
 model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00001, device=device)
 optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
@@ -110,7 +115,7 @@ for epoch in range(EPOCH):
                 p_results = ClusterEvalAll.aggregate(t_results)
                 print(p_results)
             dataset = get_dataset(df, df_norm, sample_size, feature_columns)
-            A, E, X = compute_distance(dataset, model_name_simple)
+            A, E, X = compute_distance(dataset, model_name_large)
     loss = train_epoch_step(epoch, A, E, X, model, optimizer, device)
     print(loss)
 

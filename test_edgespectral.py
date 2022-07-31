@@ -43,7 +43,7 @@ def get_dataset(df, df_norm, sample_size, feature_columns):
     sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
     df_trim = df.iloc[sample_ids].copy()
     dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm)
-    dataset.initialize_dense()
+    dataset.initialize_dense(to_dense=True)
     return dataset
 
 def compute_distance(dataset, model_name):
@@ -65,40 +65,24 @@ def compute_distance(dataset, model_name):
         class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32).flatten(), 2)
         print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
 
-        E = torch.sparse_coo_tensor(A.indices(), 1-SX.flatten(), A.shape).coalesce()
-        D = torch.zeros((E.shape[0]))
-        for i, v in zip(E.indices()[0], E.values()):
-            D[i] += v
-        for i, v in zip(E.indices()[1], E.values()):
-            D[i] += v
-        D /= 2
-        weights = E.values() / torch.sqrt(D[E.indices()[0]] * D[E.indices()[1]])
-        A = torch.sparse_coo_tensor(E.indices(), weights, E.shape).coalesce()
-    return A, E, X
-
-def train_epoch_step(epoch, A, E, X, model, optimizer, device):
-    model.train()
-    model.config(True)
-    A,E,X = A.to(device),E.to(device),X.to(device)
-    model.add_graph(A)
-    model.add_connectivity(E.values())
-    loss = model(X)
-    loss.backward()
-    optimizer.step()
-    optimizer.zero_grad()
-    return loss.item()
+        E = (1-SX)
+        # E = torch.sparse_coo_tensor(A.indices(), 1-SX, A.shape)
+    return E
 
 
-model_name_simple = f'm12i_model_edgegen_32_32_epoch{100}.pth'
+model_name_simple = f'm12i_model_edgegen_32_32_epoch{1300}.pth'
 
 t_results = []
 for i in range(10):
     dataset = get_dataset(df, df_norm, sample_size, feature_columns)
-    A, E, X = compute_distance(dataset, model_name_simple)
+    E = compute_distance(dataset, model_name_simple)
 
     clusterer = C_Spectral(n_components=30, assign_labels='kmeans')
     dist = E.to_dense().numpy()
     dist = (dist + np.transpose(dist))/2
+    dist += 0.03
+    np.fill_diagonal(dist, 0)
+    print(np.mean(dist), np.std(dist))
     clusterer.add_data(dist)
     clusters = clusterer.fit()
 

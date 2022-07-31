@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import json
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.optim import SGD, Adam
@@ -29,9 +30,11 @@ if __name__ == '__main__':
     print(f'running with {device}')
 
     df_ = pd.read_hdf(dataset_path+'.h5', key='star')
-    df_std = pd.read_csv(dataset_path+'_std.csv')
+    with open(dataset_path+'_norm.json', 'r') as f:
+        df_norm = json.load(f)
     df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
-    df_test_std = pd.read_csv(test_dataset_path+'_std.csv')
+    with open(test_dataset_path+'_norm.json', 'r') as f:
+        df_test_norm = json.load(f)
 
     sample_size = 1000
     sample_size = min(sample_size, len(df_))
@@ -44,15 +47,16 @@ if __name__ == '__main__':
     df_test = df_test.iloc[sample_ids].copy()
 
     print(df.columns)
-    feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    # feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
 
-    dataset = GraphDataset(df, feature_columns, 'cluster_id', 50, feature_divs=df_std)
-    dataset.initialize()
-    test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 50, feature_divs=df_test_std)
-    test_dataset.initialize()
+    dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, feature_norms=df_norm)
+    dataset.initialize_dense()
+    test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 999, feature_norms=df_test_norm)
+    test_dataset.initialize_dense()
 
 
-    model = GCNEdgeDot(len(feature_columns), graph_layer_sizes=[64,64,64], similar_weight=1, device=device)
+    model = GCNEdge(len(feature_columns), graph_layer_sizes=[32,32], similar_weight=1, device=device)
     optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
     def train_epoch_step(epoch, dataset, model, optimizer, device):
@@ -92,13 +96,13 @@ if __name__ == '__main__':
                 metrics = ClassificationAcc(preds, C.numpy().astype(np.int32), 2)
                 print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
-                torch.save(model, f'weights/model_gnn_edgedot_64_64_64_epoch{epoch}.pth')
+                torch.save(model, f'weights/model_gnn_32_32_epoch{epoch}.pth')
 
                 sample_size = 1000
                 sample_size = min(sample_size, len(df_))
                 sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
                 df = df_.iloc[sample_ids].copy()
-                dataset = GraphDataset(df, feature_columns, 'cluster_id', 50, feature_divs=df_std)
+                dataset = GraphDataset(df, feature_columns, 'cluster_id', 50, feature_norms=df_norm)
                 # dataset.cluster_transform(transforms=[GlobalJitterTransform(0.2), GlobalScaleTransform(0.5)])
                 dataset.global_transform(transforms=[JitterTransform(0.05)])
                 dataset.initialize()
