@@ -46,9 +46,12 @@ if __name__ == '__main__':
 
     print(df.columns)
     feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
-    feature_weights = [0.1067, 0.0950, 0.0418, 0.0506, 0.0182, 0.0619, 0.0662, 0.0260, 0.1168,
-        0.0294, 0.0464, 0.0576, 0.0335, 0.0653, 0.0086, 0.0105, 0.0071, 0.0619,
-        0.0185, 0.0638, 0.0141]
+    #feature_weights = [0.1067, 0.0950, 0.0418, 0.0506, 0.0182, 0.0619, 0.0662, 0.0260, 0.1168,
+    #    0.0294, 0.0464, 0.0576, 0.0335, 0.0653, 0.0086, 0.0105, 0.0071, 0.0619,
+    #    0.0185, 0.0638, 0.0141]
+    # feature_weights = [0.0986, 0.1254, 0.0496, 0.0339, 0.0110, 0.0540, 0.0513, 0.0257, 0.1378,
+    #     0.0321, 0.0535, 0.0696, 0.0477, 0.0465, 0.0178, 0.0002, 0.0005, 0.0769,
+    #     0.0038, 0.0465, 0.0175]
     
 
     cluster_ids = df['cluster_id'].to_numpy()
@@ -145,6 +148,7 @@ if __name__ == '__main__':
         print(f'count:\n {pd.DataFrame(metrics.count_matrix)}, \n precision:\n {pd.DataFrame(np.round(metrics.precision_matrix,2))}, \n recall: \n{pd.DataFrame(np.round(metrics.recall_matrix,2))}')
         print(f'loss: {np.mean(np.array(t_loss))}')
         torch.save(model, f'weights/model_contrastive_64_64_epoch{epoch}.pth')
+        return np.mean(np.array(t_loss))
 
     def test_epoch_step_cluster(epoch, dataset, model, num_classes, device, sample_size=10000):
         model.eval()
@@ -163,23 +167,29 @@ if __name__ == '__main__':
         print(f'TP: {cluster_eval.TP}, T: {cluster_eval.T}, P: {cluster_eval.P}')
         torch.save(model, f'weights/model_pairwise_256_256_3_epoch{epoch}.pth')
 
-
+    min_feature_w = 0
+    min_test_loss = 1e9
     for epoch in range(EPOCH):
-        print(torch.abs(model.W)/torch.sum(torch.abs(model.W)))
+        # print(torch.abs(model.W)/torch.sum(torch.abs(model.W)))
         train_epoch_step(epoch, dataloader, model, optimizer, device)
         with torch.no_grad():
             dataloader.dataset.cluster_transform(transforms=[GlobalJitterTransform(), GlobalScaleTransform()])
             dataloader.dataset.global_transform(transforms=[JitterTransform()])
             if (epoch+1) % 2 == 0:
                 print('training set acc:')
-                test_epoch_step_contrastive(epoch, dataloader, model, device)
+                train_loss = test_epoch_step_contrastive(epoch, dataloader, model, device)
                 print('testing set acc:')
-                test_epoch_step_contrastive(epoch, test_dataloader, model, device)
+                test_loss = test_epoch_step_contrastive(epoch, test_dataloader, model, device)
 
                 dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_norms=df_norm, positive_percent=0)
                 dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
 
-                print(torch.abs(model.W)/torch.sum(torch.abs(model.W)))
+                feature_w = torch.abs(model.W)/torch.sum(torch.abs(model.W))
+                if test_loss < min_test_loss:
+                    min_feature_w = feature_w
+                    min_test_loss = test_loss
+                print(f'min loss: {min_test_loss}')
+                print(min_feature_w)
 
 
 
