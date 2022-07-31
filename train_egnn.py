@@ -143,7 +143,7 @@ if __name__ == '__main__':
                 writer.add_scalar('Loss/test', loss, epoch)
 
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
-                torch.save(model, f'weights/m12i_dense_mid_model_32_32_epoch{epoch}.pth')
+                torch.save(model, f'weights/m12i_dense_small_model_32_32_epoch{epoch}.pth')
 
                 sample_size = 1000
                 sample_size = min(sample_size, len(df_))
