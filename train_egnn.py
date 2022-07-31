@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
 
     for epoch in range(EPOCH):
-        if (epoch) % 10 == 0:      
+        if (epoch) % 50 == 0:      
             with torch.no_grad():
                 model.config(False)
                 model.eval()
