@@ -86,32 +86,14 @@ class ClusterDataset(Dataset):
         else:
             return feature, self.labels[idx]
 
-class ContrastDataset(Dataset):
-    def __init__(self, dataframe, features, cluster_ids, feature_divs=None, positive_percent=None, transforms=[]):
-        super().__init__()
+class ContrastDataset(ClusterDataset):
+    def __init__(self, dataframe, features, cluster_ids, feature_norms=None, positive_percent=None, transforms=[]):
+        super().__init__(dataframe, features, cluster_ids, feature_norms)
         if positive_percent is None:
             self.positive_percent = 0.2
         else:
             self.positive_percent = positive_percent
-        self.standard_feature_divs = {'estar':1e5, 'lzstar':2000, 'lxstar':2000, 'lystar':2000, 'jzstar':2000, 'jrstar':2000, 'eccstar':1, 'rstar':4, 'feH':1, 'mgfe':0.5, 'xstar':10, 'ystar':10, 'zstar':10, 'vxstar':200, 'vystar':200, 'vzstar':200, 'vrstar':200, 'vphistar':200, 'vrstar':200, 'vthetastar':200}
-        if feature_divs is None:
-            self.feature_divs = torch.tensor([self.standard_feature_divs[feature] for feature in features])
-        else:
-            self.feature_divs = torch.tensor([feature_divs[feature].to_numpy()[0] for feature in features])
-        if isinstance(features, np.ndarray):
-            self.features = torch.tensor(features).float()
-        else:
-            self.features = torch.tensor(dataframe[features].to_numpy()).float()
-        self.features /= self.feature_divs[None,...]
-        if cluster_ids is None:
-            self.labels = None
-        elif isinstance(cluster_ids, str):
-            self.labels = torch.tensor(dataframe[cluster_ids].to_numpy()).long()
-        else:
-            self.labels = torch.tensor(cluster_ids).long()
-        if self.labels is not None:
-            self.labels -= torch.min(self.labels)
-
+        
         self.cluster_ids = list(set([label.item() for label in self.labels]))
         self.clusters = {}
         for i in range(len(self.labels)):
@@ -186,7 +168,7 @@ class GraphDataset(ClusterDataset):
         if to_dense:
             self.A = self.A.coalesce().to_dense()
 
-    
+
 
     def __init__(self, dataframe, features, cluster_ids=None, knn=5, normalize=True, feature_norms=None, scales=None, discretize=False):
         super().__init__(dataframe, features, cluster_ids, feature_norms, scales)

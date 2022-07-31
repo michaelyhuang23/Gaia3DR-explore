@@ -7,14 +7,14 @@ class ScaleContrastModel(nn.Module):
     def __init__(self, input_size, device='cpu'):
         super().__init__()
         self.device = device
-        self.classifier = nn.Linear(input_size, 1, device=self.device)
+        self.W = nn.Parameter(torch.randn(input_size)/input_size**0.5)
 
     def config(self, classify=True):
         self.classify = classify
 
     def forward(self, X1, X2, y1=None, y2=None):
-        X = torch.abs(X1-X2)
-        X = torch.sigmoid(self.classifier(X))[:,0]
+        X = torch.sum((torch.abs(X1-X2)*torch.abs(self.W)[None,...]), dim=-1)**2
+        X = 1-torch.exp(-X)
         if y1 is not None and y2 is not None and self.classify:
             return F.binary_cross_entropy(X, (y1!=y2).float())
         else:

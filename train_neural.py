@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torch.optim import SGD, Adam
 from collections import Counter
+import json
 
 from neural_dataset import *
 from neural_preprocess import *
@@ -19,10 +20,10 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     EPOCH = 500
     data_root = 'data/simulation'
-    dataset_name = 'm12f_cluster_data_large_cluster_v2'
+    dataset_name = 'm12i_cluster_data_large_cluster_v2'
     dataset_path = os.path.join(data_root, dataset_name)
 
-    test_dataset_name = 'm12i_cluster_data_large_cluster_v2'
+    test_dataset_name = 'm12f_cluster_data_large_cluster_v2'
     test_dataset_path = os.path.join(data_root, test_dataset_name)
 
     #5, 15, 10, 16, 19, 3, 12, 7, 13, 22, 24, 21
@@ -33,15 +34,21 @@ if __name__ == '__main__':
     print(f'running with {device}')
 
     df = pd.read_hdf(dataset_path+'.h5', key='star')
-    df_std = pd.read_csv(dataset_path+'_std.csv')
     df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
-    df_test_std = pd.read_csv(test_dataset_path+'_std.csv')
+
+    with open(dataset_path+'_norm.json', 'r') as f:
+        df_norm = json.load(f)
+    with open(test_dataset_path+'_norm.json', 'r') as f:
+        df_test_norm = json.load(f)
 
     #df = df.loc[df['cluster_id']<20].copy()
     #df = df.loc[np.isin(df['cluster_id'], easy_small_clusters)].copy()
 
     print(df.columns)
-    feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'xstar', 'ystar', 'zstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+    feature_weights = [0.1067, 0.0950, 0.0418, 0.0506, 0.0182, 0.0619, 0.0662, 0.0260, 0.1168,
+        0.0294, 0.0464, 0.0576, 0.0335, 0.0653, 0.0086, 0.0105, 0.0071, 0.0619,
+        0.0185, 0.0638, 0.0141]
     
 
     cluster_ids = df['cluster_id'].to_numpy()
@@ -56,18 +63,19 @@ if __name__ == '__main__':
     # dataset = ClusterDataset(df, feature_columns, 'class', feature_divs=df_std, transforms=[JitterTransform(), ScaleTransform()])
     # test_dataset = ClusterDataset(df_test, feature_columns, 'class', feature_divs=df_test_std)
 
-    dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std, transforms=[JitterTransform(), ScaleTransform()], positive_percent=0)
-    test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_divs=df_test_std, positive_percent=0)
+    dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_norms=df_norm, transforms=[JitterTransform(), ScaleTransform()], positive_percent=0)
+    test_dataset = ContrastDataset(df_test, feature_columns, 'cluster_id', feature_norms=df_test_norm, positive_percent=0)
 
     dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=128, shuffle=True)
 
-    #mapper = ClusterMap(len(feature_columns), [32, 32], device=device)
+    # mapper = ClusterMap(len(feature_columns), [32, 32], device=device)
     #classifier = GaussianHead(mapper.output_size, id_count, weights=weights, device=device)
     #model = ClassificationModel(len(feature_columns), id_count, device=device, mapper=mapper, classifier=classifier)
-    #pairer = PairwiseHead(metric='euclidean')
-    #model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
-    model = ContrastModel(len(feature_columns), layer_sizes=[64,64], similar_weight=4, device=device)
+    # pairer = PairwiseHead(metric='euclidean')
+    # model = PairwiseModel(len(feature_columns), device=device, mapper=mapper, pairloss=pairer)
+    # model = ContrastModel(len(feature_columns), layer_sizes=[64,64], similar_weight=4, device=device)
+    model = ScaleContrastModel(len(feature_columns), device=device)
     clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=20, min_samples=10, cluster_selection_method='eom', cluster_selection_epsilon=0.01)
     optimizer = Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
 
@@ -157,6 +165,7 @@ if __name__ == '__main__':
 
 
     for epoch in range(EPOCH):
+        print(torch.abs(model.W)/torch.sum(torch.abs(model.W)))
         train_epoch_step(epoch, dataloader, model, optimizer, device)
         with torch.no_grad():
             dataloader.dataset.cluster_transform(transforms=[GlobalJitterTransform(), GlobalScaleTransform()])
@@ -167,8 +176,10 @@ if __name__ == '__main__':
                 print('testing set acc:')
                 test_epoch_step_contrastive(epoch, test_dataloader, model, device)
 
-                dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_divs=df_std, positive_percent=0)
+                dataset = ContrastDataset(df, feature_columns, 'cluster_id', feature_norms=df_norm, positive_percent=0)
                 dataloader = DataLoader(dataset, batch_size=128, shuffle=True)
+
+                print(torch.abs(model.W)/torch.sum(torch.abs(model.W)))
 
 
 

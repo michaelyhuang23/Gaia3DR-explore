@@ -34,7 +34,7 @@ if __name__ == '__main__':
     df_ = pd.read_hdf(dataset_path+'.h5', key='star')
     with open(dataset_path+'_norm.json', 'r') as f:
         df_norm = json.load(f)
-    df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
+    df_test_ = pd.read_hdf(test_dataset_path+'.h5', key='star')
     with open(test_dataset_path+'_norm.json', 'r') as f:
         df_test_norm = json.load(f)
 
@@ -50,9 +50,9 @@ if __name__ == '__main__':
     df_test_norm['mean']['jrstar'] = 0
 
     sample_size = 1000
-    sample_size = min(sample_size, len(df_test))
-    sample_ids = np.random.choice(len(df_test), min(len(df_test), sample_size), replace=False)
-    df_test = df_test.iloc[sample_ids].copy()
+    sample_size = min(sample_size, len(df_test_))
+    sample_ids = np.random.choice(len(df_test_), min(len(df_test_), sample_size), replace=False)
+    df_test = df_test_.iloc[sample_ids].copy()
 
     sample_size = 1000
     sample_size = min(sample_size, len(df_))
@@ -159,6 +159,13 @@ if __name__ == '__main__':
 
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
                 torch.save(model, f'weights/m12i_model_edgegen_32_32_epoch{epoch}.pth')
+
+                sample_size = 1000
+                sample_size = min(sample_size, len(df_test_))
+                sample_ids = np.random.choice(len(df_test_), min(len(df_test_), sample_size), replace=False)
+                df_test = df_test_.iloc[sample_ids].copy()
+                test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_test_norm, scales=feature_weights)
+                test_dataset.initialize_dense(to_dense=True)
 
         if (epoch) % 10 == 0: 
             sample_size = 1000
