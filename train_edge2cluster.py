@@ -27,6 +27,8 @@ dataset_name = 'm12f_cluster_data_large_cluster_v2'
 dataset_path = os.path.join(data_root, dataset_name)
 EPOCH = 40000
 
+writer = SummaryWriter()
+
 df = pd.read_hdf(dataset_path+'.h5', key='star')
 with open(dataset_path+'_norm.json', 'r') as f:
     df_norm = json.load(f)
@@ -36,8 +38,8 @@ df_norm['mean']['lystar'] = 0
 df_norm['mean']['jzstar'] = 0
 df_norm['mean']['jrstar'] = 0
 
-#feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
-feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
+feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+# feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
 
 def get_dataset(df, df_norm, sample_size, feature_columns):
     sample_size = min(len(df), sample_size)
@@ -83,6 +85,7 @@ def train_epoch_step(epoch, A, E, X, model, optimizer, device):
     model.add_connectivity(E.values())
     loss = model(X)
     loss.backward()
+    writer.add_scalar('Loss/test', loss.item(), epoch)
     optimizer.step()
     optimizer.zero_grad()
     return loss.item()
@@ -98,7 +101,8 @@ def evaluate_step(epoch, A, E, X, labels, model, device):
     print(f'metrics for epoch {epoch}:\n {metrics()}')
     return metrics()
 
-model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
+model_name_small = f'm12i_dense_small_model_32_32_epoch{2300}.pth'
+model_name_simple = f'm12i_dense_model_32_32_epoch{1350}.pth'
 model_name_large = f'm12i_dense_bugged_model_32_32_epoch{1500}.pth'
 model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00001, device=device)
 optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
@@ -114,8 +118,10 @@ for epoch in range(EPOCH):
                     t_results.pop(0)
                 p_results = ClusterEvalAll.aggregate(t_results)
                 print(p_results)
+                writer.add_scalar('ModeTP/test', p_results['Mode_TP'], epoch)
+
             dataset = get_dataset(df, df_norm, sample_size, feature_columns)
-            A, E, X = compute_distance(dataset, model_name_large)
+            A, E, X = compute_distance(dataset, model_name_simple)
     loss = train_epoch_step(epoch, A, E, X, model, optimizer, device)
     print(loss)
 
