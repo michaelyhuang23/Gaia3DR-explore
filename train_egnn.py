@@ -146,14 +146,15 @@ if __name__ == '__main__':
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
                 torch.save(model, f'weights/m12i_dense_small_model_32_32_epoch{epoch}.pth')
 
-                sample_size = 1000
-                sample_size = min(sample_size, len(df_))
-                sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
-                df = df_.iloc[sample_ids].copy()
-                dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm, scales=feature_weights)
-                # dataset.cluster_transform(transforms=[GlobalJitterTransform(0.2), GlobalScaleTransform(0.5)])
-                # dataset.global_transform(transforms=[JitterTransform(0.05)])
-                dataset.initialize_dense()
+        if epoch % 10 == 0:
+            sample_size = 1000
+            sample_size = min(sample_size, len(df_))
+            sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
+            df = df_.iloc[sample_ids].copy()
+            dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm, scales=feature_weights)
+            # dataset.cluster_transform(transforms=[GlobalJitterTransform(0.2), GlobalScaleTransform(0.5)])
+            # dataset.global_transform(transforms=[JitterTransform(0.05)])
+            dataset.initialize_dense()
 
         loss = train_epoch_step(epoch, dataset, model, optimizer, device)
 
