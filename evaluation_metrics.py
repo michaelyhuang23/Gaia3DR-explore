@@ -219,7 +219,9 @@ class ClusterEvalAll:
             preds_ = preds
             preds = np.argmax(preds, axis=-1)
         else:
-            preds_ = None
+            K = np.max(preds)+1
+            preds_ = np.ones((len(preds), K)) * 0.01/(K-1)
+            preds_[np.arange(len(preds)), preds] = 0.99
         IoU = ClusterEvalIoU(preds, labels, IoU_thres=0.5)
         self.results['IoU_TP'] = IoU.TP
         self.results['IoU_T'] = IoU.T

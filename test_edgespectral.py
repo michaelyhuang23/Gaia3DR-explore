@@ -36,14 +36,15 @@ df_norm['mean']['lystar'] = 0
 df_norm['mean']['jzstar'] = 0
 df_norm['mean']['jrstar'] = 0
 
-feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+# feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+feature_columns = ['estar', 'feH', 'lzstar', 'lystar', 'lxstar', 'jzstar', 'jrstar', 'mgfe','eccstar', 'zstar']
 
 def get_dataset(df, df_norm, sample_size, feature_columns):
     sample_size = min(len(df), sample_size)
     sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
     df_trim = df.iloc[sample_ids].copy()
     dataset = GraphDataset(df_trim, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm)
-    dataset.initialize_dense(to_dense=True)
+    dataset.initialize_dense()
     return dataset
 
 def compute_distance(dataset, model_name):
@@ -58,19 +59,19 @@ def compute_distance(dataset, model_name):
         n = X.shape[0]
         C = dataset.labels[None,...].repeat(n, 1) != dataset.labels[...,None].repeat(1, n)
         model.add_graph(D,A,X)
-        FX, SX = model(X)
+        SX = model(X)
         SX = SX.detach()
         print(SX.shape,C.shape)
         preds = np.rint(SX.numpy()).astype(np.int32).flatten()
         class_metrics = ClassificationAcc(preds, C.numpy().astype(np.int32).flatten(), 2)
         print(f'test acc: {class_metrics.precision}\n{class_metrics.count_matrix}')
-
+        SX = torch.sparse_coo_tensor(A.indices(), SX, A.shape).to_dense()
         E = (1-SX)
         # E = torch.sparse_coo_tensor(A.indices(), 1-SX, A.shape)
     return E
 
 
-model_name_simple = f'm12i_model_edgegen_32_32_epoch{1300}.pth'
+model_name_simple = f'm12i_dense_small_model_32_32_epoch{1000}.pth'
 
 t_results = []
 for i in range(10):

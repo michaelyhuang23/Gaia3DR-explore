@@ -38,7 +38,8 @@ df_norm['mean']['lystar'] = 0
 df_norm['mean']['jzstar'] = 0
 df_norm['mean']['jrstar'] = 0
 
-feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+# feature_columns = ['estar', 'feH', 'c_lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+feature_columns = ['estar', 'feH', 'lzstar', 'lystar', 'lxstar', 'jzstar', 'jrstar', 'mgfe','eccstar', 'zstar']
 # feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
 
 def get_dataset(df, df_norm, sample_size, feature_columns):
@@ -101,10 +102,11 @@ def evaluate_step(epoch, A, E, X, labels, model, device):
     print(f'metrics for epoch {epoch}:\n {metrics()}')
     return metrics()
 
-model_name_small = f'm12i_dense_small_model_32_32_epoch{2300}.pth'
-model_name_simple = f'm12i_dense_model_32_32_epoch{1350}.pth'
+model_name_small = f'm12i_dense_small_model_32_32_epoch{1000}.pth'
+model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
+model_name_orig_change = f'm12i_dense_orig_model_32_32_epoch{3950}.pth'
 model_name_large = f'm12i_dense_bugged_model_32_32_epoch{1500}.pth'
-model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00001, device=device)
+model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00000, device=device)
 optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
 
 t_results = []
@@ -121,7 +123,7 @@ for epoch in range(EPOCH):
                 writer.add_scalar('ModeTP/test', p_results['Mode_TP'], epoch)
 
             dataset = get_dataset(df, df_norm, sample_size, feature_columns)
-            A, E, X = compute_distance(dataset, model_name_simple)
+            A, E, X = compute_distance(dataset, model_name_small)
     loss = train_epoch_step(epoch, A, E, X, model, optimizer, device)
     print(loss)
 
