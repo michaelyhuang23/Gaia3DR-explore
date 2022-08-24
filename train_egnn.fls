@@ -1,8 +1,0 @@
-PWD /Users/michaelyhuang23/ProjectData/RSI/Gaia3DR-explore
-INPUT /usr/local/texlive/2021/texmf.cnf
-INPUT /usr/local/texlive/2021/texmf-dist/web2c/texmf.cnf
-INPUT /usr/local/texlive/2021/texmf-var/web2c/pdftex/pdflatex.fmt
-INPUT /Users/michaelyhuang23/ProjectData/RSI/Gaia3DR-explore/train_egnn.py
-OUTPUT /Users/michaelyhuang23/ProjectData/RSI/Gaia3DR-explore/train_egnn.log
-OUTPUT /Users/michaelyhuang23/ProjectData/RSI/Gaia3DR-explore/train_egnn.pdf
-INPUT /usr/local/texlive/2021/texmf-var/fonts/map/pdftex/updmap/pdftex.map
