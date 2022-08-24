@@ -34,7 +34,7 @@ if __name__ == '__main__':
     df_ = pd.read_hdf(dataset_path+'.h5', key='star')
     with open(dataset_path+'_norm.json', 'r') as f:
         df_norm = json.load(f)
-    df_test = pd.read_hdf(test_dataset_path+'.h5', key='star')
+    df_test_ = pd.read_hdf(test_dataset_path+'.h5', key='star')
     with open(test_dataset_path+'_norm.json', 'r') as f:
         df_test_norm = json.load(f)
 
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     df_test_norm['mean']['jrstar'] = 0
 
     sample_size = 1000
-    df_test = sample_space(df_test, radius=5, radius_sun=8.2, sample_size=sample_size)
+    df_test = sample_space(df_test_, radius=5, radius_sun=8.2, sample_size=sample_size)
 
     sample_size = 1000
     df = sample_space(df_, radius=5, radius_sun=8.2, sample_size=sample_size)
@@ -117,27 +117,35 @@ if __name__ == '__main__':
                 print(f'train loss: {loss}')
                 writer.add_scalar('Loss/train', loss, epoch)
 
+                avg_loss = np.zeros((0))
+                for eval_run in range(10):
+                    sample_size = 1000
+                    df_test = sample_space(df_test_, radius=5, radius_sun=8.2, sample_size=sample_size)
+                    test_dataset = GraphDataset(df_test, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_test_norm, scales=feature_weights)
+                    test_dataset.initialize_dense()
 
-                model.config(False)
-                model.eval()
-                A, X, C = test_dataset[0]
-                D = test_dataset.D
-                A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
-                model.add_graph(D,A,X)
-                model.add_connectivity(C)
-                SX = model(X).cpu()
-                preds = np.rint(SX.numpy()).astype(np.int32)
-                metrics = ClassificationAcc(preds, C.cpu().numpy().astype(np.int32), 2)
-                print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
-                writer.add_scalar('Acc/test', metrics.precision, epoch)
+                    model.config(False)
+                    model.eval()
+                    A, X, C = test_dataset[0]
+                    D = test_dataset.D
+                    A,X,C,D = A.to(device),X.to(device),C.to(device),D.to(device)
+                    model.add_graph(D,A,X)
+                    model.add_connectivity(C)
+                    SX = model(X).cpu()
+                    preds = np.rint(SX.numpy()).astype(np.int32)
+                    metrics = ClassificationAcc(preds, C.cpu().numpy().astype(np.int32), 2)
+                    print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
+                    writer.add_scalar('Acc/test', metrics.precision, epoch)
 
-                model.config(True)
-                model.train()
-                model.add_graph(D,A,X)
-                model.add_connectivity(C)
-                loss = model(X)
-                print(f'test loss: {loss}')
-                writer.add_scalar('Loss/test', loss, epoch)
+                    model.config(True)
+                    model.train()
+                    model.add_graph(D,A,X)
+                    model.add_connectivity(C)
+                    loss = model(X)
+                    avg_loss[eval_run] = loss
+
+                print(f'test loss: {np.mean(avg_loss)}')
+                writer.add_scalar('Loss/test', np.mean(avg_loss), epoch)
 
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
                 torch.save(model, f'weights/m12i_dense_orig_model_32_32_epoch{epoch}.pth')
