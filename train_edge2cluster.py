@@ -104,7 +104,7 @@ def evaluate_step(epoch, A, E, X, labels, model, device):
 
 model_name_small = f'm12i_dense_small_model_32_32_epoch{1000}.pth'
 model_name_simple = f'm12i_dense_model_32_32_epoch{1450}.pth'
-model_name_orig_change = f'm12i_dense_orig_model_32_32_epoch{3950}.pth'
+model_name_orig_change = f'm12i_dense_orig_model_32_32_epoch{3900}.pth'
 model_name_large = f'm12i_dense_bugged_model_32_32_epoch{1500}.pth'
 model = GCNEdge2Cluster(len(feature_columns), num_cluster=30, graph_layer_sizes=[64], regularizer=0.00000, device=device)
 optimizer = Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
@@ -123,7 +123,7 @@ for epoch in range(EPOCH):
                 writer.add_scalar('ModeTP/test', p_results['Mode_TP'], epoch)
 
             dataset = get_dataset(df, df_norm, sample_size, feature_columns)
-            A, E, X = compute_distance(dataset, model_name_small)
+            A, E, X = compute_distance(dataset, model_name_orig_change)
     loss = train_epoch_step(epoch, A, E, X, model, optimizer, device)
     print(loss)
 
