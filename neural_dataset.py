@@ -4,6 +4,18 @@ import numpy as np
 import random
 import torch
 
+def sample_space(df_, radius=5, radius_sun=8, sample_size=1000):
+    df = df_.copy()
+    phi = np.random.uniform(0, np.pi*2)
+    xsun = np.cos(phi)*radius_sun
+    ysun = np.sin(phi)*radius_sun
+    zsun = np.random.normal(0, 0.016)
+    df = df.loc[(df['xstar'].to_numpy()-xsun)**2 + (df['ystar'].to_numpy()-ysun)**2 + (df['zstar'].to_numpy()-zsun)**2 < radius**2]
+    if len(df) > sample_size:
+        sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
+        df = df.iloc[sample_ids].copy()
+    return df
+
 class GlobalJitterTransform:
     def __init__(self, jitter_range=0.1):
         self.jitter_range = jitter_range

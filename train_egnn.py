@@ -50,14 +50,10 @@ if __name__ == '__main__':
     df_test_norm['mean']['jrstar'] = 0
 
     sample_size = 1000
-    sample_size = min(sample_size, len(df_test))
-    sample_ids = np.random.choice(len(df_test), min(len(df_test), sample_size), replace=False)
-    df_test = df_test.iloc[sample_ids].copy()
+    df_test = sample_space(df_test, radius=5, radius_sun=8.2, sample_size=sample_size)
 
     sample_size = 1000
-    sample_size = min(sample_size, len(df_))
-    sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
-    df = df_.iloc[sample_ids].copy()
+    df = sample_space(df_, radius=5, radius_sun=8.2, sample_size=sample_size)
 
     print(df.columns)
     # feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
@@ -148,9 +144,7 @@ if __name__ == '__main__':
 
         if epoch % 5 == 0:
             sample_size = 1000
-            sample_size = min(sample_size, len(df_))
-            sample_ids = np.random.choice(len(df_), min(len(df_), sample_size), replace=False)
-            df = df_.iloc[sample_ids].copy()
+            df = sample_space(df_, radius=5, radius_sun=8.2, sample_size=sample_size)
             dataset = GraphDataset(df, feature_columns, 'cluster_id', 999, normalize=False, feature_norms=df_norm, scales=feature_weights)
             # dataset.cluster_transform(transforms=[GlobalJitterTransform(0.2), GlobalScaleTransform(0.5)])
             # dataset.global_transform(transforms=[JitterTransform(0.05)])
