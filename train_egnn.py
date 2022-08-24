@@ -117,7 +117,8 @@ if __name__ == '__main__':
                 print(f'train loss: {loss}')
                 writer.add_scalar('Loss/train', loss, epoch)
 
-                avg_loss = np.zeros((0))
+                avg_loss = np.zeros((10))
+                avg_precision = np.zeros((10))
                 for eval_run in range(10):
                     sample_size = 1000
                     df_test = sample_space(df_test_, radius=5, radius_sun=8.2, sample_size=sample_size)
@@ -135,16 +136,19 @@ if __name__ == '__main__':
                     preds = np.rint(SX.numpy()).astype(np.int32)
                     metrics = ClassificationAcc(preds, C.cpu().numpy().astype(np.int32), 2)
                     print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
-                    writer.add_scalar('Acc/test', metrics.precision, epoch)
+                    avg_precision[eval_run] = metrics.precision
 
                     model.config(True)
                     model.train()
                     model.add_graph(D,A,X)
                     model.add_connectivity(C)
                     loss = model(X)
+                    print(f'test loss: {loss}')
                     avg_loss[eval_run] = loss
 
-                print(f'test loss: {np.mean(avg_loss)}')
+                print(f'avg test loss: {np.mean(avg_loss)}')
+                print(f'avg test precision: {np.mean(avg_precision)}')
+                writer.add_scalar('Acc/test', np.mean(avg_precision), epoch)
                 writer.add_scalar('Loss/test', np.mean(avg_loss), epoch)
 
                 # print(np.mean(SX.numpy()), np.std(SX.numpy()))
