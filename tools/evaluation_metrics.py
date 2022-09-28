@@ -55,9 +55,7 @@ class ClusterEvalIoU:
         self.TP = 0
         for cluster_id in unique_labels.keys():
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
-            mode, count = stats.mode(self.preds[point_ids], axis=None)
-            mode = mode[0]
-            count = count[0]
+            mode, count = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             IoU = count / (unique_labels[cluster_id]+unique_preds[mode]-count)
             if mode>-1 and IoU >= IoU_thres:
                 self.TP+=1
@@ -83,9 +81,9 @@ class ClusterEvalMode:
         self.TP = 0
         for cluster_id in unique_labels.keys():
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
-            mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None)
+            mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             point_ids_preds = np.argwhere(self.preds == mode_pred)[:,0]
-            mode_label, count_label = stats.mode(self.labels[point_ids_preds], axis=None)
+            mode_label, count_label = stats.mode(self.labels[point_ids_preds], axis=None, keepdims=False)
             if mode_pred>-1 and mode_label>-1 and mode_label == cluster_id:
                 self.TP += 1
 
@@ -138,11 +136,11 @@ class ClusterEvalModeC:
         self.TP_C = 0
         for cluster_id in unique_labels:
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
-            mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None)
+            mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             point_ids_preds = np.argwhere(self.preds == mode_pred)[:,0]
-            mode_label, count_label = stats.mode(self.labels[point_ids_preds], axis=None)
+            mode_label, count_label = stats.mode(self.labels[point_ids_preds], axis=None, keepdims=False)
             if mode_pred>-1 and mode_label>-1 and mode_label == cluster_id:
-                self.TP_C += count_label[0]
+                self.TP_C += count_label
 
         self.recall_C = self.TP_C / len(self.labels)
 
@@ -252,18 +250,6 @@ class ClusterEvalAll:
         self.results['ARand'] = ARand
 
         if preds_ is not None:
-            ModeSoft = ClusterEvalModeSoft(preds_, labels)
-            self.results['ModeSoft_TP'] = ModeSoft.TP
-            self.results['ModeSoft_T'] = ModeSoft.T
-            self.results['ModeSoft_P'] = ModeSoft.P
-            self.results['ModeSoft_precision'] = ModeSoft.precision
-            self.results['ModeSoft_recall'] = ModeSoft.recall
-            self.results['ModeSoft_F1'] = ModeSoft.F1
-
-            ModeSoftC = ClusterEvalModeCSoft(preds_, labels)
-            self.results['ModeSoft_TP_C'] = ModeSoftC.TP_C
-            self.results['ModeSoft_recall_C'] = ModeSoftC.recall_C
-
             ModeProb = ClusterEvalSoft(preds_, labels)
             self.results['ModeProb_TP'] = ModeProb.TP
             self.results['ModeProb_T'] = ModeProb.T

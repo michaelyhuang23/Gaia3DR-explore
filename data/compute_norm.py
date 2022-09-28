@@ -4,7 +4,7 @@ import json
 import os
 
 
-data_dir = 'simulation'
+data_dir = 'caterpillar/labeled_caterpillar_data'
 
 file_paths = [os.path.join(data_dir,file) for file in os.listdir(data_dir) if file.endswith('.h5')]
 for path in file_paths:

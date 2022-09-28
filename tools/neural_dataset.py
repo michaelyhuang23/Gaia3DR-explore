@@ -40,43 +40,37 @@ class ScaleTransform:
     def __call__(self, X):
         return X * (torch.randn_like(X) * self.scale_range + 1)
 
-class ClusterDataset(Dataset):
-    def __init__(self, dataframe, features, cluster_ids=None, feature_norms=None, scales=None):
-        super().__init__() 
-        self.features_subs = torch.tensor([feature_norms['mean'][feature] for feature in features])
-        self.feature_divs = torch.tensor([feature_norms['std'][feature] for feature in features])
-        if isinstance(features, np.ndarray):
-            self.features = torch.tensor(features).float()
-        else:
-            self.features = torch.tensor(dataframe[features].to_numpy()).float()
-        self.features -= self.features_subs[None,...]
+class PointDataset(Dataset):
+    def __init__(self, feature_columns, cluster_ids=None, scales=None):
+        super().__init__()
+        self.feature_columns = feature_columns
+        self.cluster_ids = cluster_ids
+        self.scales = scales
+
+    def load_data(self, df, df_norm):
+        self.features_subs = torch.tensor([df_norm['mean'][feature] for feature in self.feature_columns])
+        self.feature_divs = torch.tensor([df_norm['std'][feature] for feature in self.feature_columns])
+        self.features = torch.tensor(df[self.feature_columns].to_numpy()).float()
+        #self.features -= self.features_subs[None,...] # we don't center data
         self.features /= self.feature_divs[None,...]
 
-        if isinstance(scales, np.ndarray):
-            self.features *= torch.tensor(scales)[None,...]
-
-        if cluster_ids is None:
+        if not self.scales is None:
+            self.features *= torch.tensor([self.scales[feature] for feature in self.feature_columns])[None,...]
+        if self.cluster_ids is None:
             self.labels = None
-        elif isinstance(cluster_ids, str):
-            self.labels = torch.tensor(dataframe[cluster_ids].to_numpy()).long()
         else:
-            self.labels = torch.tensor(cluster_ids).long()
-        if self.labels is not None:
-            self.labels -= torch.min(self.labels)
-
-        self.cluster_ids = list(set([label.item() for label in self.labels]))
+            self.labels = torch.tensor(df[self.cluster_ids].to_numpy()).long()
+            self.labels -= torch.min(self.labels) # first one is always 0
         self.clusters = {}
         for i in range(len(self.labels)):
-            if self.labels[i].item() not in self.clusters:
+            if self.labels[i].item() not in self.clusters.keys():
                 self.clusters[self.labels[i].item()] = []
-            self.clusters[self.labels[i].item()].append(i)
-
-        assert self.labels is None or len(self.labels) == self.features.shape[0]
+            self.clusters[self.labels[i].item()].append(i)        
 
     def cluster_transform(self, transforms=None):
         if transforms is None:
             transforms = self.transforms
-        for cluster_id in self.cluster_ids:
+        for cluster_id in self.clusters.keys():
             features = self.features[torch.tensor(self.clusters[cluster_id])]
             for transform in transforms:
                 features = transform(features)
@@ -98,7 +92,7 @@ class ClusterDataset(Dataset):
         else:
             return feature, self.labels[idx]
 
-class ContrastDataset(ClusterDataset):
+class ContrastDataset(PointDataset):
     def __init__(self, dataframe, features, cluster_ids, feature_norms=None, positive_percent=None, transforms=[]):
         super().__init__(dataframe, features, cluster_ids, feature_norms)
         if positive_percent is None:
@@ -145,7 +139,7 @@ class ContrastDataset(ClusterDataset):
         return feature, o_feature, self.labels[idx], self.labels[other_id]
 
 
-class GraphDataset(ClusterDataset):
+class GraphDataset(PointDataset):
     def initialize(self):
         # assert self.knn+1 < self.features.shape[0]/2
         nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
