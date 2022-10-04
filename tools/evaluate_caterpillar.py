@@ -24,13 +24,14 @@ class CaterpillarEvaluator:
 
     def evaluate(self, dataset_id, eval_epoch=10):
         print(f'evaluating {dataset_id}')
-        dataset_name = f'labeled_{dataset_id}_0'
+        dataset_name = f'labeled_{dataset_id}_all'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
         with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         metrics = []
         for i in range(eval_epoch):
             df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            print(len(df))
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
             labels = self.clusterer.fit()
