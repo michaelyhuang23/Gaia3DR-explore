@@ -17,8 +17,15 @@ dataset = PointDataset(feature_columns, 'cluster_id',)
 
 def evaluate_param(min_cluster_size, min_samples):
     clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=min_cluster_size, min_samples=min_samples, cluster_selection_method='eom')
-    evaluator = CaterpillarEvaluator(clusterer, dataset, 1000, True)
+    evaluator = CaterpillarEvaluator(clusterer, dataset, 1000000, True)
     f_metrics = evaluator.evaluate_all()
-    print(f_metrics)
+    return f_metrics
 
-evaluate_param(3, None)
+results = {}
+for min_cluster_size in [2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,20,24,30,40,55,70]:
+    metric = evaluate_param(min_cluster_size, None)
+    results[min_cluster_size] = metric
+
+
+with open('../results/hdbscan_caterpillar.json', 'w') as f:
+    json.dump(results, f)

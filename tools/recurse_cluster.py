@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from cluster_analysis import Clusterer, C_HDBSCAN
+from tools.cluster_analysis import Clusterer, C_HDBSCAN
 
 # all clustering models from cluster_analysis should have the same api
 

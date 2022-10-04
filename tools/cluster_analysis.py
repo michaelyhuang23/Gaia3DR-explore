@@ -1,10 +1,17 @@
 import pandas as pd
 import numpy as np
+import copy
 from sklearn.cluster import DBSCAN, KMeans, AffinityPropagation, SpectralClustering
 from sklearn.mixture import GaussianMixture
 from hdbscan import HDBSCAN
 from scipy import stats
 from collections import Counter
+
+import torch
+from torch.optim import SGD, Adam
+from torch.utils.tensorboard import SummaryWriter
+
+from tools.gnn_cluster import *
 
 class Clusterer:
     def __init__(self):
@@ -55,5 +62,75 @@ class C_GaussianMixture(Clusterer):
         self.cluster.max_iter = epoch
         return self.cluster.fit_predict(self.data)
         
+
+
+class TrainableClusterer(Clusterer):
+    def __init__(self):
+        super().__init__()
+
+    def add_data(self, data):
+        pass
+
+    def fit(self):
+        pass
+
+    def train(self):
+        pass
+
+
+class C_SNC(TrainableClusterer):
+    def __init__(self, egnn_input_size, n_components, similar_weight=1, egnn_lr=0.01, clustergen_lr=0.01, clustergen_regularizer=0.00001, device='cpu'):
+        self.device = device
+        self.n_components = n_components
+        self.egnn_input_size = egnn_input_size
+        self.egnn = GCNEdgeBased(egnn_input_size, similar_weight, self.device).to(self.device)
+        self.egnn_optim = Adam(self.egnn.parameters(), lr=egnn_lr, weight_decay=1e-5)
+        self.clustergen = GCNEdge2Cluster(egnn_input_size, num_cluster=n_components, graph_layer_sizes=[64], regularizer=clustergen_regularizer, device=self.device)
+        self.clustergen_optim = Adam(self.clustergen.parameters(), lr=clustergen_lr, weight_decay=1e-5)
+
+    def add_data(self, dataset):
+        self.D, self.A, self.X, self.C = dataset.D.to(self.device), dataset.A.to(self.device), dataset.X.to(self.device), dataset.C.to(self.device)
+        self.egnn.add_graph(self.D,self.A,self.X)
+        self.egnn.add_connectivity(self.C)
+
+    def train(self):
+        self.egnn.config(True)
+        loss = self.egnn(self.X)
+        loss.backward()
+        self.egnn_optim.step()
+        self.egnn_optim.zero_grad()
+        self.loss = loss.item()
+        return self.loss
+
+    def fit(self, EPOCH=200):
+        clustergen = copy.deepcopy(self.clustergen)
+        clustergen_optim = copy.deepcopy(self.clustergen_optim)
+        clustergen.train()
+        clustergen.config(True)
+        with torch.no_grad():
+            self.egnn.config(False)
+            SX = self.egnn(self.X).detach()
+            SX = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape)
+            self.E = 1 - SX*0.999  # big issue here cuz it turns into dense since most items will be 1 instead of 0
+            self.DE = (torch.sum(self.E, axis=0).coalesce().to_dense() + torch.sum(self.E, axis=1).coalesce().to_dense())/2 # computes affinity "degree"
+            weights = self.E.values() / torch.sqrt(self.DE[self.E.indices()[0]] * self.DE[self.E.indices()[1]])
+            self.AE = torch.sparse_coo_tensor(self.E.indices(), weights, self.E.shape).coalesce()
+
+        for epoch in range(EPOCH):
+            clustergen.add_graph(self.AE)
+            clustergen.add_connectivity(self.E.values())
+            loss = clustergen(self.X)
+            loss.backward()
+            clustergen_optim.step()
+            clustergen_optim.zero_grad()
+            if (epoch+1)%10 == 0:
+                print(loss.item())
+
+        clustergen.eval()
+        clustergen.config(False)
+        clustergen.add_graph(AE)
+        clustergen.add_connectivity(E.values())
+        FX = clustergen(X).detach().numpy()
+        return FX
 
 

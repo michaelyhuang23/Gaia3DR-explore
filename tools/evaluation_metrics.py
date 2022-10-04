@@ -196,8 +196,8 @@ class ClusterEvalSoft:
         row_modes = np.argmax(SS, axis=0)
         rows = np.arange(SS.shape[0])
         chosen_rows = rows[row_modes[column_modes[rows]] == rows]
-        print(chosen_rows)
-        print(column_modes[chosen_rows])
+#        print(chosen_rows)
+#        print(column_modes[chosen_rows])
 
         self.TP = len(chosen_rows)
         self.P = SS.shape[-1]
@@ -213,6 +213,7 @@ class ClusterEvalAll:
     def __init__(self, preds, labels):
         super().__init__()
         self.results = {}
+        preds = preds - np.min(preds) # start at 0, there cannot be -1
         if len(preds.shape)>1 :
             preds_ = preds
             preds = np.argmax(preds, axis=-1)

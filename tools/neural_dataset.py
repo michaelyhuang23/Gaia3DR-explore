@@ -4,12 +4,12 @@ import numpy as np
 import random
 import torch
 
-def sample_space(df_, radius=5, radius_sun=8, sample_size=1000):
+def sample_space(df_, radius=5, radius_sun=8, zsun_range=0.016, sample_size=1000):
     df = df_.copy()
     phi = np.random.uniform(0, np.pi*2)
     xsun = np.cos(phi)*radius_sun
     ysun = np.sin(phi)*radius_sun
-    zsun = np.random.normal(0, 0.016)
+    zsun = np.random.normal(0, zsun_range)
     df = df.loc[(df['xstar'].to_numpy()-xsun)**2 + (df['ystar'].to_numpy()-ysun)**2 + (df['zstar'].to_numpy()-zsun)**2 < radius**2]
     if len(df) > sample_size:
         sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
@@ -92,6 +92,67 @@ class PointDataset(Dataset):
         else:
             return feature, self.labels[idx]
 
+class GraphDataset(PointDataset):
+    def initialize(self):
+        assert self.knn+1 < self.features.shape[0]/2
+        nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
+        distances, y_indices = nbrs.kneighbors(self.features)
+        print('knn finished')
+        y_indices = y_indices[:, 1:].flatten()
+        x_indices = np.arange(len(y_indices))//self.knn
+        indices = np.stack([x_indices, y_indices], axis=0)
+        indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
+        indices = np.unique(indices, axis=-1)
+        counts = np.bincount(indices.flatten()) // 2 # degree of each
+        weights = np.ones((indices.shape[-1])) #
+        if self.normalize:
+            weights /= np.sqrt(counts[indices[0]] * counts[indices[1]])
+        self.D = torch.tensor(counts)
+        self.A = torch.sparse_coo_tensor(indices, weights, (len(self.labels), len(self.labels))).float().coalesce()
+        if self.labels is None:
+            self.C = None
+        else:
+            self.C = self.labels[indices[0]] != self.labels[indices[1]]
+
+    def initialize_dense(self, to_dense=False):
+        self.D = torch.ones((len(self.labels))) * (len(self.labels)-1)
+        self.A = torch.ones((len(self.labels), len(self.labels)))
+        if self.normalize:
+            self.A /= (len(self.labels)-1)
+        self.A = self.A.to_sparse()
+        if self.labels is None:
+            self.C = None
+        else:
+            self.C = self.labels[self.A.indices()[0]] != self.labels[self.A.indices()[1]]
+        if to_dense:
+            self.A = self.A.coalesce().to_dense()
+
+    def __init__(self, feature_columns, cluster_ids=None, scales=None, knn=5, normalize=True, discretize=False):
+        super().__init__(feature_columns, cluster_ids, scales)
+        self.knn = knn
+        self.normalize = normalize
+        self.discretize = discretize
+
+    def load_data(self, df, df_norm):
+        super().load_data(df, df_norm)
+        self.X = self.features
+        if self.discretize:
+            unique_labels = np.unique(self.labels.numpy())
+            reverse_map = {label:i for i,label in enumerate(unique_labels)}
+            self.labels = torch.tensor([reverse_map[label] for label in self.labels.numpy()])
+            self.count_labels = torch.max(self.labels)+1
+        if self.knn is None:
+            self.initialize_dense()
+        else:
+            self.initialize()
+
+    def __len__(self):
+        return 1
+
+    def __getitem__(self, idx):
+        return None
+
+
 class ContrastDataset(PointDataset):
     def __init__(self, dataframe, features, cluster_ids, feature_norms=None, positive_percent=None, transforms=[]):
         super().__init__(dataframe, features, cluster_ids, feature_norms)
@@ -138,59 +199,3 @@ class ContrastDataset(PointDataset):
         o_feature = self.features[other_id]
         return feature, o_feature, self.labels[idx], self.labels[other_id]
 
-
-class GraphDataset(PointDataset):
-    def initialize(self):
-        # assert self.knn+1 < self.features.shape[0]/2
-        nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
-        distances, y_indices = nbrs.kneighbors(self.features)
-        print('knn finished')
-        y_indices = y_indices[:, 1:].flatten()
-        x_indices = np.arange(len(y_indices))//self.knn
-        indices = np.stack([x_indices, y_indices], axis=0)
-        indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
-        indices = np.unique(indices, axis=-1)
-        counts = np.bincount(indices.flatten()) // 2
-        weights = np.ones((indices.shape[-1])) #
-        if self.normalize:
-            weights /= np.sqrt(counts[indices[0]] * counts[indices[1]])
-        self.D = torch.tensor(counts)
-        self.A = torch.sparse_coo_tensor(indices, weights, (len(self.labels), len(self.labels))).float().coalesce()
-        if self.labels is None:
-            self.C = None
-        else:
-            self.C = self.labels[indices[0]] != self.labels[indices[1]]
-
-    def initialize_dense(self, to_dense=False):
-        self.D = torch.ones((len(self.labels))) * (len(self.labels)-1)
-        self.A = torch.ones((len(self.labels), len(self.labels)))
-        if self.normalize:
-            self.A /= (len(self.labels)-1)
-        self.A = self.A.to_sparse()
-        if self.labels is None:
-            self.C = None
-        else:
-            self.C = self.labels[self.A.indices()[0]] != self.labels[self.A.indices()[1]]
-        if to_dense:
-            self.A = self.A.coalesce().to_dense()
-
-
-
-    def __init__(self, dataframe, features, cluster_ids=None, knn=5, normalize=True, feature_norms=None, scales=None, discretize=False):
-        super().__init__(dataframe, features, cluster_ids, feature_norms, scales)
-        self.knn = knn
-        self.normalize = normalize
-        if discretize:
-            unique_labels = np.unique(self.labels.numpy())
-            reverse_map = {label:i for i,label in enumerate(unique_labels)}
-            self.labels = torch.tensor([reverse_map[label] for label in self.labels.numpy()])
-            self.count_labels = torch.max(self.labels)+1
-
-    def __len__(self):
-        return 1
-
-    def __getitem__(self, idx):
-        if self.labels is None:
-            return self.A, self.features
-        else:
-            return self.A, self.features, self.C    
