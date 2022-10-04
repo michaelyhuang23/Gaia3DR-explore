@@ -112,7 +112,7 @@ class GraphDataset(PointDataset):
         if self.labels is None:
             self.C = None
         else:
-            self.C = self.labels[indices[0]] != self.labels[indices[1]]
+            self.C = self.labels[indices[0]] == self.labels[indices[1]]
 
     def initialize_dense(self, to_dense=False):
         self.D = torch.ones((len(self.labels))) * (len(self.labels)-1)
@@ -123,7 +123,7 @@ class GraphDataset(PointDataset):
         if self.labels is None:
             self.C = None
         else:
-            self.C = self.labels[self.A.indices()[0]] != self.labels[self.A.indices()[1]]
+            self.C = self.labels[self.A.indices()[0]] == self.labels[self.A.indices()[1]]
         if to_dense:
             self.A = self.A.coalesce().to_dense()
 

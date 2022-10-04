@@ -209,7 +209,7 @@ class GCNEdgeBased(GNN): # non-overlapping
         SX = torch.sigmoid(SX)[:,0]
         if self.classify:
             weights = torch.ones_like(self.C, dtype=torch.float32)
-            weights[SX<0.5] *= self.similar_weight
+            weights[SX>0.5] *= self.similar_weight
             return F.binary_cross_entropy(SX, self.C.float(), weight=weights)
         else:
             return SX

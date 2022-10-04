@@ -110,11 +110,10 @@ class C_SNC(TrainableClusterer):
         with torch.no_grad():
             self.egnn.config(False)
             SX = self.egnn(self.X).detach()
-            SX = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape)
-            self.E = 1 - SX*0.999  # big issue here cuz it turns into dense since most items will be 1 instead of 0
+            self.E = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape) # E denotes affinity
             self.DE = (torch.sum(self.E, axis=0).coalesce().to_dense() + torch.sum(self.E, axis=1).coalesce().to_dense())/2 # computes affinity "degree"
             weights = self.E.values() / torch.sqrt(self.DE[self.E.indices()[0]] * self.DE[self.E.indices()[1]])
-            self.AE = torch.sparse_coo_tensor(self.E.indices(), weights, self.E.shape).coalesce()
+            self.AE = torch.sparse_coo_tensor(self.E.indices(), weights, self.E.shape).coalesce() # AE is the normalized affinity
 
         for epoch in range(EPOCH):
             clustergen.add_graph(self.AE)
