@@ -269,6 +269,10 @@ class GCNEdge2Cluster(GNN): # non-overlapping
         NFX = torch.log(1-FX**2)
         pregularize = -torch.sum(torch.log(1.0001-torch.exp(torch.sum(NFX, dim=0))), dim=0)
         if self.classify:
+            print('FF')
+            print(FF)
+            print('self.C')
+            print(self.C)
             loss = torch.mean((FF - self.C)**2)
             print(loss.item(), self.regularizer*pregularize.item())
             return loss + self.regularizer * pregularize

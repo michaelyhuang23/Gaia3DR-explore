@@ -85,13 +85,17 @@ class C_SNC(TrainableClusterer):
         self.egnn_input_size = egnn_input_size
         self.egnn = GCNEdgeBased(egnn_input_size, similar_weight, self.device).to(self.device)
         self.egnn_optim = Adam(self.egnn.parameters(), lr=egnn_lr, weight_decay=1e-5)
-        self.clustergen = GCNEdge2Cluster(egnn_input_size, num_cluster=n_components, graph_layer_sizes=[64], regularizer=clustergen_regularizer, device=self.device)
-        self.clustergen_optim = Adam(self.clustergen.parameters(), lr=clustergen_lr, weight_decay=1e-5)
+        self.clustergen_lr = clustergen_lr
+        self.clustergen_regularizer = clustergen_regularizer
 
     def add_data(self, dataset):
         self.D, self.A, self.X, self.C = dataset.D.to(self.device), dataset.A.to(self.device), dataset.X.to(self.device), dataset.C.to(self.device)
         self.egnn.add_graph(self.D,self.A,self.X)
         self.egnn.add_connectivity(self.C)
+
+    def initialize_model(self):
+        self.clustergen = GCNEdge2Cluster(self.egnn_input_size, num_cluster=self.n_components, graph_layer_sizes=[64], regularizer=self.clustergen_regularizer, device=self.device)
+        self.clustergen_optim = Adam(self.clustergen.parameters(), lr=self.clustergen_lr, weight_decay=1e-5)
 
     def train(self):
         self.egnn.config(True)
@@ -103,33 +107,32 @@ class C_SNC(TrainableClusterer):
         return self.loss
 
     def fit(self, EPOCH=200):
-        clustergen = copy.deepcopy(self.clustergen)
-        clustergen_optim = copy.deepcopy(self.clustergen_optim)
-        clustergen.train()
-        clustergen.config(True)
+        self.initialize_model()
+        self.clustergen.train()
+        self.clustergen.config(True)
         with torch.no_grad():
             self.egnn.config(False)
             SX = self.egnn(self.X).detach()
-            self.E = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape) # E denotes affinity
-            self.DE = (torch.sum(self.E, axis=0).coalesce().to_dense() + torch.sum(self.E, axis=1).coalesce().to_dense())/2 # computes affinity "degree"
+            self.E = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape).coalesce() # E denotes affinity
+            self.DE = (torch.sparse.sum(self.E, dim=0).coalesce().to_dense() + torch.sparse.sum(self.E, dim=1).coalesce().to_dense())/2 # computes affinity "degree"
             weights = self.E.values() / torch.sqrt(self.DE[self.E.indices()[0]] * self.DE[self.E.indices()[1]])
             self.AE = torch.sparse_coo_tensor(self.E.indices(), weights, self.E.shape).coalesce() # AE is the normalized affinity
 
         for epoch in range(EPOCH):
-            clustergen.add_graph(self.AE)
-            clustergen.add_connectivity(self.E.values())
-            loss = clustergen(self.X)
+            self.clustergen.add_graph(self.AE)
+            self.clustergen.add_connectivity(self.E.values())
+            loss = self.clustergen(self.X)
             loss.backward()
-            clustergen_optim.step()
-            clustergen_optim.zero_grad()
+            self.clustergen_optim.step()
+            self.clustergen_optim.zero_grad()
             if (epoch+1)%10 == 0:
                 print(loss.item())
 
-        clustergen.eval()
-        clustergen.config(False)
-        clustergen.add_graph(AE)
-        clustergen.add_connectivity(E.values())
-        FX = clustergen(X).detach().numpy()
+        self.clustergen.eval()
+        self.clustergen.config(False)
+        self.clustergen.add_graph(self.AE)
+        self.clustergen.add_connectivity(self.E.values())
+        FX = self.clustergen(self.X).detach().numpy()
         return FX
 
 

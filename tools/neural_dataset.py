@@ -97,7 +97,6 @@ class GraphDataset(PointDataset):
         assert self.knn+1 < self.features.shape[0]/2
         nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
         distances, y_indices = nbrs.kneighbors(self.features)
-        print('knn finished')
         y_indices = y_indices[:, 1:].flatten()
         x_indices = np.arange(len(y_indices))//self.knn
         indices = np.stack([x_indices, y_indices], axis=0)
