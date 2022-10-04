@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import os
 import copy
 from sklearn.cluster import DBSCAN, KMeans, AffinityPropagation, SpectralClustering
 from sklearn.mixture import GaussianMixture
@@ -134,5 +135,12 @@ class C_SNC(TrainableClusterer):
         self.clustergen.add_connectivity(self.E.values())
         FX = self.clustergen(self.X).detach().numpy()
         return FX
+
+    def save_model(self, root, epoch):
+        egnn_path = os.path.join(root, 'egnn')
+        clustergen_path = os.path.join(root, 'clustergen')
+        torch.save(self.egnn, os.path.join(egnn_path, f'epoch{epoch}.pth'))
+        torch.save(self.clustergen, os.path.join(clustergen_path, f'epoch{epoch}.pth'))
+
 
 

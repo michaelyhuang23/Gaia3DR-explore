@@ -46,7 +46,7 @@ class CaterpillarTrainer:
             if train_id in val_ids: continue
             self.train_step(train_id, train_epoch=10)
         f_metric = self.evaluate_all(val_ids)        
-        print(f_metric)
+        return f_metric
 
     def evaluate(self, dataset_id, eval_epoch=10):
         print(f'evaluating {dataset_id}')
