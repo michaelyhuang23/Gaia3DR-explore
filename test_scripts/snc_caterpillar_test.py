@@ -32,6 +32,10 @@ def evaluate_param(clustergen_regularizer=0.0001):
 metric = evaluate_param()
 print(metric)
 
+results = {0.0001 : metric}
+
+with open('../results/snc_caterpillar.json', 'w') as f:
+    json.dump(results, f)
 
 
 
