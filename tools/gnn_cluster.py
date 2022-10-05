@@ -176,7 +176,7 @@ class EdgeGCNConv(nn.Module): # has relu built in
             return nA
 
 class GCNEdgeBased(GNN): # non-overlapping
-    def __init__(self, input_size, similar_weight=1, device='cpu'):
+    def __init__(self, input_size, similar_weight=1, regularizer=0.1, device='cpu'):
         super().__init__()
         self.device = device
         self.input_size = input_size
@@ -188,6 +188,7 @@ class GCNEdgeBased(GNN): # non-overlapping
         self.convE2 = EdgeGCNConv(32, 32, 32)
         self.classifier = nn.Linear(32, 1)
         self.similar_weight = similar_weight
+        self.regularizer = regularizer
 
     def add_graph(self, D, A, X):
         self.D = D
@@ -198,19 +199,30 @@ class GCNEdgeBased(GNN): # non-overlapping
     def forward(self, X):
         X = torch.zeros_like(X)
         A = self.A.clone()
+        #print(A)
         X = self.convN1(self.D, A, X)
+        #print(X)
         X = self.dropout1(X)
+        #print(X)
         A = self.convE1(A, X)
+        #print(A)
         X = self.convN2(self.D, A, X)
         X = self.dropout2(X)
         A = self.convE2(A, X)
         # assert torch.all(A.indices() == self.A.indices()).item()
         SX = self.classifier(A.values())
+        #print(SX)
         SX = torch.sigmoid(SX)[:,0]
+        print(torch.mean(SX).item(), torch.std(SX).item())
+        loss_regularze = -torch.mean((SX-torch.mean(SX))**4)**0.25
+        print(loss_regularze.item())
         if self.classify:
             weights = torch.ones_like(self.C, dtype=torch.float32)
             weights[SX>0.5] *= self.similar_weight
-            return F.binary_cross_entropy(SX, self.C.float(), weight=weights)
+            #print(torch.sum(self.C.float()))
+            loss = F.binary_cross_entropy(SX, self.C.float(), weight=weights)
+            print(loss.item(), loss_regularze.item())
+            return loss + loss_regularze * self.regularizer
         else:
             return SX
 
@@ -269,12 +281,8 @@ class GCNEdge2Cluster(GNN): # non-overlapping
         NFX = torch.log(1-FX**2)
         pregularize = -torch.sum(torch.log(1.0001-torch.exp(torch.sum(NFX, dim=0))), dim=0)
         if self.classify:
-            print('FF')
-            print(FF)
-            print('self.C')
-            print(self.C)
             loss = torch.mean((FF - self.C)**2)
-            print(loss.item(), self.regularizer*pregularize.item())
+            #print(loss.item(), self.regularizer*pregularize.item())
             return loss + self.regularizer * pregularize
         else:
             return FX

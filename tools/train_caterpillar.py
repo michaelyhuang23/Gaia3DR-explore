@@ -8,7 +8,7 @@ from tools.evaluation_metrics import *
 from tools.neural_dataset import *
 
 class CaterpillarTrainer:
-    def __init__(self, clusterer_model, dataset, sample_size, val_size = 4, k_fold = 6):
+    def __init__(self, clusterer_model, dataset, sample_size, val_size = 4, k_fold = 6, writer = None):
         # clusterer is an untrained Clusterer, dataset is an empty Dataset
         super().__init__()
         self.train_ids = [1104787, 1130025, 1195075, 1195448, 1232164, 1268839, 1292085,\
@@ -23,12 +23,14 @@ class CaterpillarTrainer:
         self.val_size = val_size
         self.k_fold = k_fold
         self.val_set = []
+        self.writer = writer
+        self.counter = 0
         for fold in range(k_fold):
             start = len(self.train_ids)//k_fold*fold
             end = start + self.val_size
             self.val_set.append(self.train_ids[start:end])
 
-    def train_step(self, dataset_id, train_epoch=10, repetition=10):
+    def train_step(self, dataset_id, train_epoch=1, repetition=5):
         print(f'training {dataset_id}')
         dataset_name = f'labeled_{dataset_id}_all'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
@@ -40,16 +42,18 @@ class CaterpillarTrainer:
             self.clusterer.add_data(self.dataset)
             for j in range(repetition):
                 loss = self.clusterer.train()
+                self.writer.add_scalar('Loss', loss, self.counter)
+                self.counter += 1
                 print(f'run {i}, instance {j}, loss: {loss}')
 
     def train_set(self, val_ids):
         for train_id in self.train_ids:
             if train_id in val_ids: continue
-            self.train_step(train_id, train_epoch=10)
-        f_metric = self.evaluate_all(val_ids)        
+            self.train_step(train_id, train_epoch=1, repetition=10)
+        f_metric = self.evaluate_all(val_ids)
         return f_metric
 
-    def evaluate(self, dataset_id, eval_epoch=10):
+    def evaluate(self, dataset_id, eval_epoch=1):
         print(f'evaluating {dataset_id}')
         dataset_name = f'labeled_{dataset_id}_all'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
@@ -67,8 +71,9 @@ class CaterpillarTrainer:
             t_labels = self.dataset.labels
             if torch.is_tensor(t_labels):
                 t_labels = t_labels.detach().cpu().numpy()            
-            cluster_eval = ClusterEvalAll(labels, self.dataset.labels)
-            metrics.append(cluster_eval())           
+            cluster_eval = ClusterEvalAll(labels, self.dataset.labels.cpu().numpy())
+            metric = cluster_eval()
+            metrics.append(metric)           
         return ClusterEvalAll.aggregate(metrics)
         
     def evaluate_all(self, val_ids):

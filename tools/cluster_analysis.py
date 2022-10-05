@@ -13,6 +13,7 @@ from torch.optim import SGD, Adam
 from torch.utils.tensorboard import SummaryWriter
 
 from tools.gnn_cluster import *
+from tools.evaluation_metrics import *
 
 class Clusterer:
     def __init__(self):
@@ -80,11 +81,11 @@ class TrainableClusterer(Clusterer):
 
 
 class C_SNC(TrainableClusterer):
-    def __init__(self, egnn_input_size, n_components, similar_weight=1, egnn_lr=0.01, clustergen_lr=0.01, clustergen_regularizer=0.00001, device='cpu'):
+    def __init__(self, egnn_input_size, n_components, similar_weight=1, egnn_lr=0.01, egnn_regularizer=0.1, clustergen_lr=0.01, clustergen_regularizer=0.00001, device='cpu'):
         self.device = device
         self.n_components = n_components
         self.egnn_input_size = egnn_input_size
-        self.egnn = GCNEdgeBased(egnn_input_size, similar_weight, self.device).to(self.device)
+        self.egnn = GCNEdgeBased(egnn_input_size, similar_weight, regularizer=egnn_regularizer, device=self.device).to(self.device)
         self.egnn_optim = Adam(self.egnn.parameters(), lr=egnn_lr, weight_decay=1e-5)
         self.clustergen_lr = clustergen_lr
         self.clustergen_regularizer = clustergen_regularizer
@@ -107,7 +108,7 @@ class C_SNC(TrainableClusterer):
         self.loss = loss.item()
         return self.loss
 
-    def fit(self, EPOCH=200):
+    def fit(self, EPOCH=2000):
         self.initialize_model()
         self.clustergen.train()
         self.clustergen.config(True)
@@ -129,7 +130,7 @@ class C_SNC(TrainableClusterer):
             loss.backward()
             self.clustergen_optim.step()
             self.clustergen_optim.zero_grad()
-            if (epoch+1)%10 == 0:
+            if (epoch+1)%50 == 0:
                 print(loss.item())
 
         self.clustergen.eval()
@@ -145,5 +146,8 @@ class C_SNC(TrainableClusterer):
         torch.save(self.egnn, os.path.join(egnn_path, f'epoch{epoch}.pth'))
         torch.save(self.clustergen, os.path.join(clustergen_path, f'epoch{epoch}.pth'))
 
+    def load_model(self, root, epoch):
+        egnn_path = os.path.join(root, 'egnn')
+        self.egnn = torch.load(os.path.join(egnn_path, f'epoch{epoch}.pth'))
 
 
