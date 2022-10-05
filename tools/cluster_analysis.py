@@ -148,6 +148,6 @@ class C_SNC(TrainableClusterer):
 
     def load_model(self, root, epoch):
         egnn_path = os.path.join(root, 'egnn')
-        self.egnn = torch.load(os.path.join(egnn_path, f'epoch{epoch}.pth'))
+        self.egnn = torch.load(os.path.join(egnn_path, f'epoch{epoch}.pth'), map_location=self.device)
 
 
