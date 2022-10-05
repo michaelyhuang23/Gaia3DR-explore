@@ -28,18 +28,19 @@ class CaterpillarTrainer:
             end = start + self.val_size
             self.val_set.append(self.train_ids[start:end])
 
-    def train_step(self, dataset_id, train_epoch=10):
+    def train_step(self, dataset_id, train_epoch=10, repetition=10):
         print(f'training {dataset_id}')
         dataset_name = f'labeled_{dataset_id}_all'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
         with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         for i in range(train_epoch):
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            df = sample_space(df_, radius=0.002, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
-            loss = self.clusterer.train()
-            print(f'run {i}, loss: {loss}')
+            for j in range(repetition):
+                loss = self.clusterer.train()
+                print(f'run {i}, instance {j}, loss: {loss}')
 
     def train_set(self, val_ids):
         for train_id in self.train_ids:
@@ -57,7 +58,7 @@ class CaterpillarTrainer:
         metrics = []
         for i in range(eval_epoch):
             print(f'cluster iteration {i}')
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            df = sample_space(df_, radius=0.002, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
             labels = self.clusterer.fit()

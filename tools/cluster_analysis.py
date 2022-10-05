@@ -114,6 +114,9 @@ class C_SNC(TrainableClusterer):
         with torch.no_grad():
             self.egnn.config(False)
             SX = self.egnn(self.X).detach()
+            preds = np.rint(SX.cpu().numpy()).astype(np.int32)
+            metrics = ClassificationAcc(preds, self.C.cpu().numpy().astype(np.int32), 2)
+            print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
             self.E = torch.sparse_coo_tensor(self.A.indices(), SX, self.A.shape).coalesce() # E denotes affinity
             self.DE = (torch.sparse.sum(self.E, dim=0).coalesce().to_dense() + torch.sparse.sum(self.E, dim=1).coalesce().to_dense())/2 # computes affinity "degree"
             weights = self.E.values() / torch.sqrt(self.DE[self.E.indices()[0]] * self.DE[self.E.indices()[1]])
