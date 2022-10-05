@@ -137,7 +137,7 @@ class C_SNC(TrainableClusterer):
         self.clustergen.config(False)
         self.clustergen.add_graph(self.AE)
         self.clustergen.add_connectivity(self.E.values())
-        FX = self.clustergen(self.X).detach().numpy()
+        FX = self.clustergen(self.X).detach().cpu().numpy()
         return FX
 
     def save_model(self, root, epoch):
