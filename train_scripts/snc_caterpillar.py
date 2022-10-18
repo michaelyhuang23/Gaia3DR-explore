@@ -19,7 +19,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar']
 
-dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, knn=100, normalize=True, discretize=False)
+dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, knn=10, normalize=True, discretize=False)
 snc_clusterer = C_SNC(len(feature_columns), 50, similar_weight=1, egnn_lr=0.003, egnn_regularizer=0.1, clustergen_lr=0.01, clustergen_regularizer=0.0001, device=device)
 
 trainer = CaterpillarTrainer(snc_clusterer, dataset, 1000000, val_size=4, k_fold=6, writer=writer)
