@@ -30,7 +30,7 @@ class CaterpillarEvaluator:
             df_norm = json.load(f)
         metrics = []
         for i in range(eval_epoch):
-            df = sample_space(df_, radius=0.002, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
             print(len(df))
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)

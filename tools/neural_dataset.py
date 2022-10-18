@@ -3,14 +3,22 @@ from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import random
 import torch
+from collections import Counter
 
-def sample_space(df_, radius=5, radius_sun=8, zsun_range=0.016, sample_size=1000):
+def filter_clusters(df, filter_size):
+    counter = Counter(df['cluster_id'].to_numpy())
+    large_keys = [key for key in counter.keys() if counter[key] > filter_size]
+    return df.loc[df['cluster_id'].isin(large_keys)]
+
+def sample_space(df_, radius=5, radius_sun=8, zsun_range=0.016, sample_size=1000, filter_size=None):
     df = df_.copy()
     phi = np.random.uniform(0, np.pi*2)
     xsun = np.cos(phi)*radius_sun
     ysun = np.sin(phi)*radius_sun
     zsun = np.random.normal(0, zsun_range)
     df = df.loc[(df['xstar'].to_numpy()-xsun)**2 + (df['ystar'].to_numpy()-ysun)**2 + (df['zstar'].to_numpy()-zsun)**2 < radius**2]
+    if filter_size is not None:
+        df = filter_clusters(df, filter_size)
     if len(df) > sample_size:
         sample_ids = np.random.choice(len(df), min(len(df), sample_size), replace=False)
         df = df.iloc[sample_ids].copy()
