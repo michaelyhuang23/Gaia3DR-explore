@@ -1,5 +1,7 @@
 ### Oct 18 2022, Tuesday
 
+1.
+
 To recap the current situation: I've just gotten the SNC algorithm to work on caterpillar. I was able to train within a radius of 2 kpc (without filtering small clusters), and using a knn of 100 to construct the clustering graph. The accuracy achieved wasn't the greatest but was bearable. 
 
 My current undertaking is to expand the radius to 5kpc and perform small cluster filtering of stars that are within the said radius. A dataset with those parameters have a cardinality between $10^4$ and $10^5$. That explodes the memory when knn=100. So, I cut knn down to 10, and it works fine. 
@@ -17,3 +19,7 @@ The LR is effective, but it is not taking away a lot from each episode of traini
 Matters hardly improve over time. 
 
 ![image-20221018130704054](/home/michaelyhuang/ProjectData/Gaia3DR-explore/temp/image-20221018130704054.png)
+
+2.
+
+I'm upping the knn to 30 and the egnn_regularizer term to 0.3 from 0.1 
