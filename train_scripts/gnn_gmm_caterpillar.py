@@ -20,7 +20,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar']
 
 dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, knn=100, randomn=None, normalize=True, discretize=False)
-gnn_gmm_clusterer = C_GNN_GMM(len(feature_columns), 50, 4, 0.0001, device)
+gnn_gmm_clusterer = C_GNN_GMM(len(feature_columns), 50, 3, 0.0001, device)
 
 trainer = CaterpillarTrainer(gnn_gmm_clusterer, dataset, 10000, val_size=4, k_fold=6, writer=writer)
 

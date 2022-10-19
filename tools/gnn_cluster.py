@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
 from sklearn.mixture import GaussianMixture
-
+import plotly.express as px
 
 def linear_loss(preds, labels, weight):
     return torch.mean((1-labels)*preds*weight + labels*(1-preds)*weight)
@@ -251,6 +251,7 @@ class GNNProjection(GNN):
 
     def add_cluster_labels(self, labels):
         self.cluster_labels = F.one_hot(labels)
+        self.labels = [str(lab) for lab in labels]
 
     def gmm_predict_proba(self, gmm_result, X):
         dim = X.shape[-1]
@@ -273,8 +274,6 @@ class GNNProjection(GNN):
         with torch.no_grad():
             gmm_result = GaussianMixture(n_components=self.num_cluster).fit(X.detach().cpu().numpy())
         FX = self.gmm_predict_proba(gmm_result, X)
-        #print(FX.shape)
-        #print(FX)
         if self.classify:
             SX = torch.log(torch.clamp(FX,min=0.001))
             corr = -torch.mm(torch.transpose(self.cluster_labels.float(),0,1), SX)
@@ -285,12 +284,15 @@ class GNNProjection(GNN):
             #print(loss.item())
             return loss
         else:
+            X_out = X.detach().cpu().numpy()
+            fig = px.scatter_3d(x=X_out[:,0], y=X_out[:,1], z=X_out[:,2],color=self.labels, opacity=1, size_max=10)
+            fig.show()
             SX = torch.log(torch.clamp(FX,min=0.001))
             corr = -torch.mm(torch.transpose(self.cluster_labels.float(),0,1), SX)
             with torch.no_grad():
                 label_idx, pred_idx = linear_sum_assignment(corr.detach().cpu().numpy())
             loss = torch.mean(corr[label_idx, pred_idx])
-            return FX, loss
+            return torch.softmax(FX, dim=-1), loss
 
 class FakeGNN(GNN): # non-overlapping
     def __init__(self, input_size, similar_weight=1, device='cpu'):
