@@ -35,3 +35,31 @@ So here is 10000 sampled, 100 knn result. It seems to do a better job with both 
 ![](assets/2022-10-18-21-41-27-image.png)
 
 ![](assets/2022-10-18-21-43-39-image.png)
+
+It seems clustering accuracy decreases as we train further, while the egnn loss keeps going down. 
+
+![](assets/2022-10-18-22-11-55-image.png)
+
+![](assets/2022-10-18-22-12-22-image.png)
+
+I will investigate why. Possibly it is overfitting to the train dataset? I will print the egnn loss for the validation dataset.
+
+Overfitting is indeed occuring,
+
+![](assets/2022-10-18-23-02-21-image.png)
+
+It seems that we eventually learn to enlarge the average predicted probability value (because some are indeed linkages separate). However, on the validation side, we never quite learn that. 
+
+Here's the result with large regularization:
+
+![](assets/2022-10-18-23-41-39-image.png)
+
+4.
+
+After some considerations, I've determined that some changes need to be made. 
+
+First, new testing has shown that simply increasing the regularizer (that enforces std) is not sufficient to create good clustering results (in fact, it's somehow forcing the clusterer to group all points into a single cluster)
+
+Second, a major shortcoming of the current system is its knn graph being shortsighted. For each evalution (convolution) of the clusterer, we are looking at a small patch of points that are close together. If you have a smooth surface, it is very difficult to determine where to cut the surface so as to separate into clusters! What we need are global viewpoints. The graph convolution with a global viewpoint will function more like an attention mechanism than a normal convolution system. There are many ways to construct global viewpoints-->small sample dense graphs, randomly chosen edges, randomly chosen edges with weighted probability based on distance to the origin point. knn + randomly chosen edges. It's difficult to determine which one would work based on intuitions.
+
+Third, we need to find a way to generate cluster assignments for all points based on few known points or edges. A simple way is to do find the nearest neighbor of each point, and just set it to be the same cluster. A more sophisticated way is to construct a sparse knn graph based on all points. Predict edges for these knn edges and then use the same approach as before. 
