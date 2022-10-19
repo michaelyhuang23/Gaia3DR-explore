@@ -23,3 +23,5 @@ Matters hardly improve over time.
 2.
 
 I'm upping the knn to 30 and the egnn_regularizer term to 0.3 from 0.1 
+
+It doesn't work.
