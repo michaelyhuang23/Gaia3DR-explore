@@ -70,4 +70,18 @@ I actually have been reading the axis wrong. The top row represents different. R
 
 6.
 
-Now I will try the old knn=100 setting, without regularization and using a linear loss.
+Now I will try the old knn=100 setting, without regularization and using a linear loss. Other losses, which are designed to reward pushing things to extreme, causes everything to be pushed to an extreme from the beginning (the same extreme). We must, unfortunately, conclude that the dataset is simply not containing sufficient info for clear separation of edges. 
+
+7.
+
+We can (potentially) improve the cluster generation step by introducing some spectral component. But the egnn is very limited. So, I've opted to do another clustering algo using projection + kmeans instead. 
+
+This has its own superweird problem: the loss keeps decreasing, but the acc goes down.
+
+![](assets/2022-10-19-09-40-13-image.png)
+
+![](assets/2022-10-19-09-41-05-image.png)
+
+![](assets/2022-10-19-09-43-09-image.png)
+
+Weird things happen partly because what you entered is not probability prediction. It's probability density.

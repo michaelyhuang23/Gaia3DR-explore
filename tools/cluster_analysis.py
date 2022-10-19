@@ -152,3 +152,41 @@ class C_SNC(TrainableClusterer):
         self.egnn = torch.load(os.path.join(egnn_path, f'epoch{epoch}.pth'), map_location=self.device)
 
 
+class C_GNN_GMM(TrainableClusterer):
+    def __init__(self, input_size, n_components, n_projection_dim, gnn_lr, device='cpu'):
+        self.device = device
+        self.n_components = n_components
+        self.model = GNNProjection(input_size, n_projection_dim, n_components, graph_layer_sizes=[32], regularizer=None, device=self.device)
+        self.model_optim = Adam(self.model.parameters(), lr=gnn_lr, weight_decay=1e-5)
+
+    def add_data(self, dataset):
+        self.X, self.A, self.labels = dataset.X.to(self.device), dataset.A.to(self.device), dataset.labels.to(self.device)
+        self.model.add_graph(self.A)
+        self.model.add_cluster_labels(self.labels)
+
+    def train(self):
+        self.model.config(True)
+        loss = self.model(self.X)
+        loss.backward()
+        self.model_optim.step()
+        self.model_optim.zero_grad()
+        self.loss = loss.item()
+        return self.loss
+
+    def fit(self, EPOCH=2000):
+        with torch.no_grad():
+            self.model.config(False)
+            self.model.eval()
+            SX, loss = self.model(self.X)
+            SX, loss = SX.detach(), loss.detach()
+        return SX, loss
+
+    def save_model(self, root, epoch):
+        model_path = os.path.join(root, 'model')
+        torch.save(self.model, os.path.join(model_path, f'epoch{epoch}.pth'))
+
+    def load_model(self, root, epoch):
+        model_path = os.path.join(root, 'model')
+        self.model = torch.load(os.path.join(model_path, f'epoch{epoch}.pth'), map_location=self.device)
+
+

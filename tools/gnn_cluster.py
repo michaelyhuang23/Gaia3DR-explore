@@ -2,9 +2,14 @@ from torch import nn
 import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
+from sklearn.mixture import GaussianMixture
 
-def linear_loss(preds, labels, weights):
-    return torch.mean((1-labels)*preds*weights + labels*(1-preds)*weights)
+
+def linear_loss(preds, labels, weight):
+    return torch.mean((1-labels)*preds*weight + labels*(1-preds)*weight)
+
+def weird_loss(preds, labels, weight):
+    return torch.mean(labels*(1+torch.log(1.1-preds))*weight + (1-labels)*(1+torch.log(preds+0.1))*weight)
 
 class GCNConv(nn.Module):
     def __init__(self, input_channels, output_channels, device='cpu'):
@@ -208,6 +213,7 @@ class GCNEdgeBased(GNN): # non-overlapping
         A = self.convE2(A, X)
         SX = self.classifier(A.values())
         SX = torch.sigmoid(SX)[:,0]
+        print(f'min: {torch.min(SX).item()}')
         print(torch.mean(SX).item(), torch.std(SX).item())
         loss_regularze = -torch.mean((SX-torch.mean(SX))**4)**0.25
         print(loss_regularze.item())
@@ -222,6 +228,69 @@ class GCNEdgeBased(GNN): # non-overlapping
         else:
             loss = F.binary_cross_entropy(SX, self.C.float())
             return SX, loss + loss_regularze * self.regularizer
+
+
+
+class GNNProjection(GNN):
+    def __init__(self, input_size, num_dim=30, num_cluster=30, graph_layer_sizes=[32], regularizer=0.01, device='cpu'):
+        super().__init__()
+        self.device = device
+        self.input_size = input_size
+        self.convs = nn.ModuleList()
+        self.dropouts = nn.ModuleList()
+        for i, size in enumerate(graph_layer_sizes):
+            prev_size = input_size if i==0 else graph_layer_sizes[i-1]
+            self.dropouts.append(nn.Dropout(p=0))
+            self.convs.append(GCNConv(prev_size, size, device=self.device))
+        prev_size = graph_layer_sizes[-1] if len(graph_layer_sizes)!=0 else input_size
+        self.dropouts.append(nn.Dropout(p=0))
+        self.convs.append(GCNConv(prev_size, num_dim, device=self.device))
+        self.num_dim = num_dim
+        self.num_cluster = num_cluster
+        self.regularizer = regularizer
+
+    def add_cluster_labels(self, labels):
+        self.cluster_labels = F.one_hot(labels)
+
+    def gmm_predict_proba(self, gmm_result, X):
+        dim = X.shape[-1]
+        costs = torch.zeros((self.num_cluster, X.shape[0]),device=self.device)
+        for i in range(self.num_cluster):
+            pos = X - torch.tensor(gmm_result.means_[i], device=self.device)
+            cov = torch.tensor(gmm_result.covariances_[i], device=self.device)
+            prec = torch.tensor(gmm_result.precisions_[i], device=self.device)
+            costs[i] = gmm_result.weights_[i]*1/torch.linalg.det(cov)**0.5*1/(2*3.1415)**(dim/2) * torch.exp(-0.5* torch.sum(torch.mm(pos, prec) * pos, dim=-1))
+        return torch.transpose(costs, 0, 1)
+
+    def forward(self, X):
+        c = 0
+        for i,conv in enumerate(self.convs):
+            X = self.dropouts[c](X)
+            c+=1
+            X = conv(self.A, X)
+            if i != len(self.convs)-1:
+                X = F.relu(X)
+        with torch.no_grad():
+            gmm_result = GaussianMixture(n_components=self.num_cluster).fit(X.detach().cpu().numpy())
+        FX = self.gmm_predict_proba(gmm_result, X)
+        #print(FX.shape)
+        #print(FX)
+        if self.classify:
+            SX = torch.log(torch.clamp(FX,min=0.001))
+            corr = -torch.mm(torch.transpose(self.cluster_labels.float(),0,1), SX)
+            #print(corr)
+            with torch.no_grad():
+                label_idx, pred_idx = linear_sum_assignment(corr.detach().cpu().numpy())
+            loss = torch.mean(corr[label_idx, pred_idx])
+            #print(loss.item())
+            return loss
+        else:
+            SX = torch.log(torch.clamp(FX,min=0.001))
+            corr = -torch.mm(torch.transpose(self.cluster_labels.float(),0,1), SX)
+            with torch.no_grad():
+                label_idx, pred_idx = linear_sum_assignment(corr.detach().cpu().numpy())
+            loss = torch.mean(corr[label_idx, pred_idx])
+            return FX, loss
 
 class FakeGNN(GNN): # non-overlapping
     def __init__(self, input_size, similar_weight=1, device='cpu'):
