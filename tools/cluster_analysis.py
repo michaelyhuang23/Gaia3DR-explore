@@ -114,7 +114,8 @@ class C_SNC(TrainableClusterer):
         self.clustergen.config(True)
         with torch.no_grad():
             self.egnn.config(False)
-            SX = self.egnn(self.X).detach()
+            SX, egnn_loss = self.egnn(self.X)
+            SX, egnn_loss = SX.detach(), egnn_loss.detach()
             preds = np.rint(SX.cpu().numpy()).astype(np.int32)
             metrics = ClassificationAcc(preds, self.C.cpu().numpy().astype(np.int32), 2)
             print(f'test acc: {metrics.precision}\n{metrics.count_matrix}')
@@ -138,7 +139,7 @@ class C_SNC(TrainableClusterer):
         self.clustergen.add_graph(self.AE)
         self.clustergen.add_connectivity(self.E.values())
         FX = self.clustergen(self.X).detach().cpu().numpy()
-        return FX
+        return FX, egnn_loss
 
     def save_model(self, root, epoch):
         egnn_path = os.path.join(root, 'egnn')

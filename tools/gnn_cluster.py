@@ -199,19 +199,13 @@ class GCNEdgeBased(GNN): # non-overlapping
     def forward(self, X):
         X = torch.zeros_like(X)
         A = self.A.clone()
-        #print(A)
         X = self.convN1(self.D, A, X)
-        #print(X)
         X = self.dropout1(X)
-        #print(X)
         A = self.convE1(A, X)
-        #print(A)
         X = self.convN2(self.D, A, X)
         X = self.dropout2(X)
         A = self.convE2(A, X)
-        # assert torch.all(A.indices() == self.A.indices()).item()
         SX = self.classifier(A.values())
-        #print(SX)
         SX = torch.sigmoid(SX)[:,0]
         print(torch.mean(SX).item(), torch.std(SX).item())
         loss_regularze = -torch.mean((SX-torch.mean(SX))**4)**0.25
@@ -224,7 +218,8 @@ class GCNEdgeBased(GNN): # non-overlapping
             print(loss.item(), loss_regularze.item())
             return loss + loss_regularze * self.regularizer
         else:
-            return SX
+            loss = F.binary_cross_entropy(SX, self.C.float())
+            return SX, loss + loss_regularze * self.regularizer
 
 class FakeGNN(GNN): # non-overlapping
     def __init__(self, input_size, similar_weight=1, device='cpu'):

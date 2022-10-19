@@ -66,7 +66,9 @@ class CaterpillarTrainer:
             df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
-            labels = self.clusterer.fit()
+            labels, loss = self.clusterer.fit()
+            self.writer.add_scalar('Val/Loss', loss, self.counter)
+            self.counter += 1
             if torch.is_tensor(labels):
                 labels = labels.detach().cpu().numpy()
             t_labels = self.dataset.labels
