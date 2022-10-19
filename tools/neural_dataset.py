@@ -101,12 +101,10 @@ class PointDataset(Dataset):
             return feature, self.labels[idx]
 
 class GraphDataset(PointDataset):
-    def initialize(self):
-        assert self.knn+1 < self.features.shape[0]/2
-        nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
-        distances, y_indices = nbrs.kneighbors(self.features)
+    def initialize(self, y_indices):
+        n_neighbors = y_indices.shape[-1]-1
         y_indices = y_indices[:, 1:].flatten()
-        x_indices = np.arange(len(y_indices))//self.knn
+        x_indices = np.arange(len(y_indices))//n_neighbors
         indices = np.stack([x_indices, y_indices], axis=0)
         indices = np.concatenate([indices, indices[::-1,:]], axis=-1)
         indices = np.unique(indices, axis=-1)
@@ -134,9 +132,10 @@ class GraphDataset(PointDataset):
         if to_dense:
             self.A = self.A.coalesce().to_dense()
 
-    def __init__(self, feature_columns, cluster_ids=None, scales=None, knn=5, normalize=True, discretize=False):
+    def __init__(self, feature_columns, cluster_ids=None, scales=None, knn=None, randomn=100, normalize=True, discretize=False):
         super().__init__(feature_columns, cluster_ids, scales)
         self.knn = knn
+        self.randomn = randomn
         self.normalize = normalize
         self.discretize = discretize
 
@@ -148,10 +147,18 @@ class GraphDataset(PointDataset):
             reverse_map = {label:i for i,label in enumerate(unique_labels)}
             self.labels = torch.tensor([reverse_map[label] for label in self.labels.numpy()])
             self.count_labels = torch.max(self.labels)+1
-        if self.knn is None:
+        if self.knn is None and self.randomn is None:
             self.initialize_dense()
         else:
-            self.initialize()
+            y_indices = np.arange(len(self.features))[...,None]
+            if self.knn is not None:
+                assert self.knn+1 < self.features.shape[0]/2
+                nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
+                distances, y_indices = nbrs.kneighbors(self.features)
+            if self.randomn is not None:
+                y_indices_new = np.random.choice(len(self.features), len(self.features)*self.randomn, replace=True).reshape((len(self.features), self.randomn))
+                y_indices = np.concatenate([y_indices, y_indices_new], axis=-1)
+            self.initialize(y_indices)
 
     def __len__(self):
         return 1

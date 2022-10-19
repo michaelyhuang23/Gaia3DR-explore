@@ -63,3 +63,11 @@ First, new testing has shown that simply increasing the regularizer (that enforc
 Second, a major shortcoming of the current system is its knn graph being shortsighted. For each evalution (convolution) of the clusterer, we are looking at a small patch of points that are close together. If you have a smooth surface, it is very difficult to determine where to cut the surface so as to separate into clusters! What we need are global viewpoints. The graph convolution with a global viewpoint will function more like an attention mechanism than a normal convolution system. There are many ways to construct global viewpoints-->small sample dense graphs, randomly chosen edges, randomly chosen edges with weighted probability based on distance to the origin point. knn + randomly chosen edges. It's difficult to determine which one would work based on intuitions.
 
 Third, we need to find a way to generate cluster assignments for all points based on few known points or edges. A simple way is to do find the nearest neighbor of each point, and just set it to be the same cluster. A more sophisticated way is to construct a sparse knn graph based on all points. Predict edges for these knn edges and then use the same approach as before. 
+
+5.
+
+I actually have been reading the axis wrong. The top row represents different. Random graph connection is bad. Local view actually isn't much of an issue because of how phase-mixed the clusters are. 
+
+6.
+
+Now I will try the old knn=100 setting, without regularization and using a linear loss.
