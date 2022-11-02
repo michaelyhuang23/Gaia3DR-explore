@@ -67,8 +67,6 @@ class GCNEdge(GNN): # non-overlapping
     def forward(self, X):
         c = 0
         for i,conv in enumerate(self.convs):
-            # X = self.dropouts[c](X)
-            # c+=1
             X = conv(self.A, X)
             X = F.relu(X)
         if not self.classify:
@@ -181,6 +179,56 @@ class EdgeGCNConv(nn.Module): # has relu built in
                 nA = F.relu(nA)
             return nA
 
+
+class GCNEdgeBased_sample(GNN): # non-overlapping
+    def __init__(self, input_size, input_size_e, num_class=7, device='cpu'):
+        super().__init__()
+        self.device = device
+        self.input_size = input_size
+        self.input_size_e = input_size_e
+        self.convN1 = NodeGCNConv(input_size, input_size_e, 256)
+        self.dropout1 = nn.Dropout(p=0.5)
+        self.convE1 = EdgeGCNConv(256, input_size_e, 32)
+        self.convN2 = NodeGCNConv(256, 32, 32)
+        self.classifier = nn.Linear(32, num_class)
+
+    def add_graph(self, D, A, X):
+        self.D = D
+        self.A = A
+
+    def forward(self, X):
+        A = self.A.clone()
+        X = self.convN1(self.D, A, X)
+        X = self.dropout1(X)
+        A = self.convE1(A, X)
+        X = self.convN2(self.D, A, X)
+        FX = self.classifier(X)
+        return FX
+
+class GCN_sample(GNN): # non-overlapping
+    def __init__(self, input_size, num_class=7, device='cpu'):
+        super().__init__()
+        self.device = device
+        self.input_size = input_size
+        self.convN1 = GCNConv(input_size, 64)
+        self.dropout1 = nn.Dropout(p=0.3)
+        self.convN2 = GCNConv(64, 32)
+        self.classifier = nn.Linear(32, num_class)
+
+    def add_graph(self, D, A, X):
+        self.D = D
+        self.A = A
+
+    def forward(self, X):
+        A = self.A.clone()
+        X = self.convN1(A, X)
+        X = self.dropout1(X)
+        X = self.convN2(A, X)
+        FX = self.classifier(X)
+        return FX
+
+
+
 class GCNEdgeBased(GNN): # non-overlapping
     def __init__(self, input_size, similar_weight=1, regularizer=0.1, device='cpu'):
         super().__init__()
@@ -203,7 +251,7 @@ class GCNEdgeBased(GNN): # non-overlapping
         self.A = torch.sparse_coo_tensor(A.indices(), weights, (*A.shape, weights.shape[-1])).coalesce().float()
 
     def forward(self, X):
-        X = torch.zeros_like(X)
+        X = torch.zeros_like(X) 
         A = self.A.clone()
         X = self.convN1(self.D, A, X)
         X = self.dropout1(X)

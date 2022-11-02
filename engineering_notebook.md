@@ -85,3 +85,4 @@ This has its own superweird problem: the loss keeps decreasing, but the acc goes
 ![](assets/2022-10-19-09-43-09-image.png)
 
 Weird things happen partly because what you entered is not probability prediction. It's probability density.
+
