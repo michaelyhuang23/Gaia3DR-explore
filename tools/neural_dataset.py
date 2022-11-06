@@ -8,7 +8,10 @@ from collections import Counter
 def filter_clusters(df, filter_size):
     counter = Counter(df['cluster_id'].to_numpy())
     large_keys = [key for key in counter.keys() if counter[key] > filter_size]
-    return df.loc[df['cluster_id'].isin(large_keys)]
+    key2id = {key:i for i,key in enumerate(large_keys)}
+    df = df.loc[df['cluster_id'].isin(large_keys)].copy()
+    df['cluster_id'] = df['cluster_id'].apply(lambda key : key2id[key])
+    return df
 
 def sample_space(df_, radius=5, radius_sun=8, zsun_range=0.016, sample_size=1000, filter_size=None):
     df = df_.copy()

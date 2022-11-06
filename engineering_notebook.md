@@ -86,3 +86,36 @@ This has its own superweird problem: the loss keeps decreasing, but the acc goes
 
 Weird things happen partly because what you entered is not probability prediction. It's probability density.
 
+### November 3rd, 2022 Saturday
+
+1.
+
+Kmeans's naive loss using the distance is not going to work out. The reason is simply that the model will project every point into a very tiny compact space--thus all the distance costs are very small.
+
+2.
+
+There is a critical mistake in the loss function I employed for GMM. The loss matching previously doesn't work because of two reasons. 1. the labels of the dataset do not start at 0 or 1 ---> these are the labels corresponding to clusters with a size larger than a certain cutoff number which we set in the `sample_space` function. 2. when matching a bunch of predicted clusters with actual clusters, if the number of predicted cluster < # of actual cluster, then only a small percent of the actual clusters are matched up. This is not idea, because the cost associated with sampling a bunch of points is not considered. In the ideal case, each predicted cluster should be allowed to match up with multiple actual clusters. Actually, that wouldn't make sense either... 
+
+On second thought, cluster matching simply doesn't seem wise. Actually, it seems alright as long as every single real cluster is matched up with something. 
+
+4.
+
+Training results of GNN_GMM:
+
+![](assets/2022-11-06-01-18-55-image.png)
+
+![](assets/2022-11-06-01-19-08-image.png)
+
+Projection results of GMM after 1 epoch:
+
+![](assets/2022-11-06-01-17-43-image.png)
+
+![](assets/2022-11-06-01-18-18-image.png)
+
+After 5 epochs:
+
+![](assets/2022-11-06-01-21-36-image.png)
+
+![](assets/2022-11-06-01-21-56-image.png)
+
+I think it is very clear that we are not learning. We need to add more features! There's no other way around. 
