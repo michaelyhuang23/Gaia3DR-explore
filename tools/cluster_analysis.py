@@ -244,12 +244,17 @@ class C_GNN_KMeans(TrainableClusterer):
     def kmeans_compute_dist(self, kmeans_result, X):
         labels = torch.tensor(kmeans_result.labels_, device=self.device).long()
         centers = torch.tensor(kmeans_result.cluster_centers_, device=self.device)
-        costs = torch.sum((X - centers[labels])**2, dim=-1)
+        other_costs = torch.exp(torch.mean(torch.log(torch.clamp(torch.norm(X[:,None,:] - centers[None,:,:], dim=-1), min=0.001)), dim=-1))
+        costs = torch.norm(X - centers[labels], dim=-1) / other_costs
         return costs
 
     def compute_loss(self, X, return_result=False):
+        if return_result is True:
+            n_components = self.num_cluster
+        else:
+            n_components = self.cluster_labels.shape[-1]
         with torch.no_grad():
-            kmeans_result = KMeans(n_clusters=self.num_cluster).fit(X.detach().cpu().numpy())
+            kmeans_result = KMeans(n_clusters=n_components).fit(X.detach().cpu().numpy())
         LX = self.kmeans_compute_dist(kmeans_result, X)
         print(LX.shape)
         loss = torch.mean(LX)
@@ -262,6 +267,7 @@ class C_GNN_KMeans(TrainableClusterer):
         self.model.config(True)
         self.model.train()
         p_X = self.model(self.X)
+        print(torch.mean(p_X), torch.std(p_X))
         loss = self.compute_loss(p_X, False)
         loss.backward()
         self.model_optim.step()
@@ -274,9 +280,9 @@ class C_GNN_KMeans(TrainableClusterer):
             self.model.config(False)
             self.model.eval()
             p_X = self.model(self.X)
-            # X_out = p_X.detach().cpu().numpy()
-            # fig = px.scatter_3d(x=X_out[:,0], y=X_out[:,1], z=X_out[:,2],color=self.label_names, opacity=1, size_max=10)
-            # fig.show()
+            X_out = p_X.detach().cpu().numpy()
+            fig = px.scatter_3d(x=X_out[:,0], y=X_out[:,1], z=X_out[:,2],color=self.label_names, opacity=1, size_max=10)
+            fig.show()
             SX, loss = self.compute_loss(p_X, True)
             SX, loss = SX.detach(), loss.detach()
         return SX, loss

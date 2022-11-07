@@ -86,7 +86,7 @@ This has its own superweird problem: the loss keeps decreasing, but the acc goes
 
 Weird things happen partly because what you entered is not probability prediction. It's probability density.
 
-### November 3rd, 2022 Saturday
+### November 5th, 2022 Saturday
 
 1.
 
@@ -119,3 +119,23 @@ After 5 epochs:
 ![](assets/2022-11-06-01-21-56-image.png)
 
 I think it is very clear that we are not learning. We need to add more features! There's no other way around. 
+
+### November 6th, 2022 Sunday
+
+1.
+
+I used k-means clustering to be the new clustering method for GNN and arrives at a very weird training result:
+
+![](assets/2022-11-06-21-19-26-image.png)
+
+![](assets/2022-11-06-21-19-47-image.png)
+
+It's due to a weird error:
+
+![](assets/2022-11-06-21-21-58-image.png)
+
+Turns out it's just learning to project everything onto a single fricking point:
+
+![](assets/2022-11-06-21-33-05-image.png)
+
+So, I think we can conclude pretty clearly that projection-based methods are no better at the task. 
