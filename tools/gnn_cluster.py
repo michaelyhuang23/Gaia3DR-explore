@@ -269,8 +269,8 @@ class GCNEdgeBased(GNN): # non-overlapping
             weights = torch.ones_like(self.C, dtype=torch.float32)
             weights[SX>0.5] *= self.similar_weight
             #print(torch.sum(self.C.float()))
-            #loss = F.binary_cross_entropy(SX, self.C.float(), weight=weights)
-            loss = linear_loss(SX, self.C.float(), weight=weights)
+            loss = F.binary_cross_entropy(SX, self.C.float(), weight=weights)
+            # loss = linear_loss(SX, self.C.float(), weight=weights)
             print(loss.item(), loss_regularze.item())
             return loss + loss_regularze * self.regularizer
         else:

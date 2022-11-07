@@ -139,3 +139,11 @@ Turns out it's just learning to project everything onto a single fricking point:
 ![](assets/2022-11-06-21-33-05-image.png)
 
 So, I think we can conclude pretty clearly that projection-based methods are no better at the task. 
+
+2.
+
+This is the egnn results after adding new variables like x,y,z and v. It is much better. There's a high precision, but I think once we trade precision for recall, it could generate decent results. 
+
+![](assets/2022-11-07-02-23-05-image.png)
+
+![](assets/2022-11-07-02-26-21-image.png)

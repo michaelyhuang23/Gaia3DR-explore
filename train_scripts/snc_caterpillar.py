@@ -17,10 +17,10 @@ from tools.train_caterpillar import *
 writer = SummaryWriter()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar']
+feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar', 'xstar', 'ystar', 'zstar', 'vstar']
 
 dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, knn=100, randomn=None, normalize=True, discretize=False)
-snc_clusterer = C_SNC(len(feature_columns), 50, similar_weight=1, egnn_lr=0.001, egnn_regularizer=3, clustergen_lr=0.01, clustergen_regularizer=0.0001, device=device)
+snc_clusterer = C_SNC(len(feature_columns), 50, similar_weight=1, egnn_lr=0.001, egnn_regularizer=0, clustergen_lr=0.01, clustergen_regularizer=0.001, device=device)
 
 trainer = CaterpillarTrainer(snc_clusterer, dataset, 10000, val_size=4, k_fold=6, writer=writer)
 
