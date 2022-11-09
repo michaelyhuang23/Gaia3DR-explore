@@ -108,7 +108,7 @@ class C_SNC(TrainableClusterer):
         self.loss = loss.item()
         return self.loss
 
-    def fit(self, EPOCH=2000):
+    def fit(self, EPOCH=4000):
         self.initialize_model()
         self.clustergen.train()
         self.clustergen.config(True)
@@ -131,7 +131,7 @@ class C_SNC(TrainableClusterer):
             loss.backward()
             self.clustergen_optim.step()
             self.clustergen_optim.zero_grad()
-            if (epoch+1)%50 == 0:
+            if (epoch+1)%100 == 0:
                 print(loss.item())
 
         self.clustergen.eval()
