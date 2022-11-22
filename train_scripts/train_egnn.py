@@ -1,3 +1,5 @@
+import sys
+sys.path.append('..')
 import torch
 import pandas as pd
 import numpy as np
@@ -11,10 +13,10 @@ from torch.optim import SGD, Adam
 from collections import Counter
 from torch.utils.tensorboard import SummaryWriter
 
-from neural_dataset import *
-from gnn_cluster import *
-from evaluation_metrics import ClassificationAcc, ClusterEvalIoU
-from cluster_analysis import C_HDBSCAN, C_GaussianMixture
+from tools.neural_dataset import *
+from tools.gnn_cluster import *
+from tools.evaluation_metrics import ClassificationAcc, ClusterEvalIoU
+from tools.cluster_analysis import C_HDBSCAN, C_GaussianMixture
 
 
 if __name__ == '__main__':
@@ -22,7 +24,7 @@ if __name__ == '__main__':
     np.random.seed(0)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     EPOCH = 4000
-    data_root = 'data/simulation'
+    data_root = '../data/simulation'
     dataset_name = 'm12i_cluster_data_large_cluster_v2'
     dataset_path = os.path.join(data_root, dataset_name)
 
@@ -58,8 +60,8 @@ if __name__ == '__main__':
     print(df.columns)
     # feature_columns = ['estar', 'lzstar', 'lxstar', 'lystar', 'jzstar', 'jrstar', 'eccstar', 'rstar', 'feH', 'mgfe', 'zstar', 'vrstar', 'vphistar', 'vthetastar', 'omegaphistar', 'omegarstar', 'omegazstar', 'thetaphistar', 'thetarstar', 'thetazstar', 'zmaxstar']
     # feature_columns = ['feH', 'estar', 'lzstar', 'eccstar', 'vthetastar', 'thetazstar', 'jrstar', 'thetaphistar', 'vrstar', 'lystar']
-    # feature_columns = ['estar', 'feH', 'lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
-    feature_columns = ['estar', 'feH', 'lzstar', 'lystar', 'lxstar', 'jzstar', 'jrstar', 'mgfe','eccstar', 'zstar']
+    feature_columns = ['estar', 'feH', 'lzstar', 'jzstar', 'mgfe', 'vrstar', 'zstar', 'vphistar', 'eccstar']
+    #feature_columns = ['estar', 'feH', 'lzstar', 'lystar', 'lxstar', 'jzstar', 'jrstar', 'mgfe','eccstar', 'zstar']
     
     # feature_weights = np.array([0.71216923,0.555757,0.31106377,0.1477975,0.13819067,0.1145066,0.08163675,0.07823427,0.07169756])
     # feature_weights /= np.mean(feature_weights)

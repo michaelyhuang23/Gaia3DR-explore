@@ -2,7 +2,6 @@ from torch import nn
 import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
-from utils import LabelEncoding
 
 
 class GCNConv(nn.Module):
