@@ -147,3 +147,9 @@ This is the egnn results after adding new variables like x,y,z and v. It is much
 ![](assets/2022-11-07-02-23-05-image.png)
 
 ![](assets/2022-11-07-02-26-21-image.png)
+
+### November 21st, 2022 Monday
+
+The new goal of the game is to first make a lot of plots to gain a deep understanding into the dataset. And then, we try to reproduce Kaley's work and using our algorithms with Kaley's settings. 
+
+9:00 PM, currently, I've just copied over the new dataset with velocity and locations and verified the validity of the data. Data are not very separable for heavy substructures. For ultra-faint dwarf galaxy however, one of the top 10 largest clusters is separable, but with the other stars, it might be hard.
