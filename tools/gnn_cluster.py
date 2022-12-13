@@ -3,7 +3,6 @@ import torch.nn.functional as F
 import torch
 from scipy.optimize import linear_sum_assignment
 from sklearn.mixture import GaussianMixture
-import plotly.express as px
 
 def linear_loss(preds, labels, weight):
     return torch.mean((1-labels)*preds*weight + labels*(1-preds)*weight)

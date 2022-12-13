@@ -8,7 +8,7 @@ from tools.neural_dataset import *
 
 
 class CaterpillarEvaluator:
-    def __init__(self, clusterer, dataset, sample_size, run_on_test=True):
+    def __init__(self, clusterer, dataset, sample_size, filterer=None, run_on_test=True):
         # clusterer is a trained Clusterer, dataset is an empty Dataset
         super().__init__()
         self.run_on_test = run_on_test
@@ -21,20 +21,23 @@ class CaterpillarEvaluator:
         self.clusterer = clusterer
         self.dataset = dataset
         self.sample_size = sample_size
+        self.filterer = filterer
 
     def evaluate(self, dataset_id, eval_epoch=10):
         print(f'evaluating {dataset_id}')
-        dataset_name = f'labeled_{dataset_id}_all'
+        dataset_name = f'labeled_{dataset_id}_0'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
         with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         metrics = []
         for i in range(eval_epoch):
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
-            print(len(df))
+            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            if self.filterer is not None: 
+                df = self.filterer(df)
+            print(f'size of dataset: {len(df)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
-            labels, loss = self.clusterer.fit()
+            labels = self.clusterer.fit()
             if torch.is_tensor(labels):
                 labels = labels.detach().cpu().numpy()
             t_labels = self.dataset.labels

@@ -11,13 +11,16 @@ from tools.evaluation_metrics import *
 from tools.evaluate_caterpillar import *
 
 
-feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar']
+feature_columns = ['estar', 'jrstar', 'jzstar', 'jphistar', 'rstar', 'vstar', 'vxstar', 'vystar', 'vzstar', 'vrstar', 'vphistar', 'phistar', 'zstar']
+
+def filterer(df):
+    return df.loc[df['redshiftstar']<2].copy()
 
 dataset = PointDataset(feature_columns, 'cluster_id',)
 
 def evaluate_param(min_cluster_size, min_samples):
     clusterer = C_HDBSCAN(metric='euclidean', min_cluster_size=min_cluster_size, min_samples=min_samples, cluster_selection_method='eom')
-    evaluator = CaterpillarEvaluator(clusterer, dataset, 1000000, True)
+    evaluator = CaterpillarEvaluator(clusterer, dataset, 1000000, filterer=filterer, run_on_test=True)
     f_metrics = evaluator.evaluate_all()
     return f_metrics
 
