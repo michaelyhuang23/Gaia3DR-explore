@@ -33,8 +33,8 @@ class CaterpillarTrainer:
     def train_step(self, dataset_id, train_epoch=1, repetition=5):
         print(f'training {dataset_id}')
         dataset_name = f'labeled_{dataset_id}_all'
-        df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
-        with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
+        df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'_0.h5'), key='star')
+        with open(os.path.join(self.dataset_root, dataset_name+'_0_norm.json'), 'r') as f:
             df_norm = json.load(f)
         for i in range(train_epoch):
             df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
