@@ -8,7 +8,7 @@ from tools.evaluation_metrics import *
 from tools.neural_dataset import *
 
 class CaterpillarTrainer:
-    def __init__(self, clusterer_model, dataset, sample_size, val_size = 4, k_fold = 6, writer = None):
+    def __init__(self, clusterer_model, dataset, sample_size, val_size = 4, k_fold = 6, filterer = None, writer = None):
         # clusterer is an untrained Clusterer, dataset is an empty Dataset
         super().__init__()
         self.train_ids = [1104787, 1130025, 1195075, 1195448, 1232164, 1268839, 1292085,\
@@ -24,6 +24,7 @@ class CaterpillarTrainer:
         self.k_fold = k_fold
         self.val_set = []
         self.writer = writer
+        self.filterer = filterer
         self.counter = 0
         for fold in range(k_fold):
             start = len(self.train_ids)//k_fold*fold
@@ -32,13 +33,15 @@ class CaterpillarTrainer:
 
     def train_step(self, dataset_id, train_epoch=1, repetition=5):
         print(f'training {dataset_id}')
-        dataset_name = f'labeled_{dataset_id}_all'
-        df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'_0.h5'), key='star')
-        with open(os.path.join(self.dataset_root, dataset_name+'_0_norm.json'), 'r') as f:
+        dataset_name = f'labeled_{dataset_id}_0'
+        df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
+        if self.filterer is not None:
+            df_ = self.filterer(df_)
+        with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         for i in range(train_epoch):
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
-            print(len(df), len(df_))
+            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            print(f'len: {len(df)}, {len(df_)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
             for j in range(repetition):
@@ -48,22 +51,26 @@ class CaterpillarTrainer:
                 print(f'run {i}, instance {j}, loss: {loss}')
 
     def train_set(self, val_ids):
-        f_metric = self.evaluate_all(val_ids)     
+        
         for train_id in self.train_ids:
             if train_id in val_ids: continue
             self.train_step(train_id, train_epoch=1, repetition=10)
+        f_metric = self.evaluate_all(val_ids)     
         return f_metric
 
     def evaluate(self, dataset_id, eval_epoch=1):
         print(f'evaluating {dataset_id}')
-        dataset_name = f'labeled_{dataset_id}_all'
+        dataset_name = f'labeled_{dataset_id}_0'
         df_ = pd.read_hdf(os.path.join(self.dataset_root, dataset_name+'.h5'), key='star')
+        if self.filterer is not None:
+            df_ = self.filterer(df_)
         with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         metrics = []
         for i in range(eval_epoch):
             print(f'cluster iteration {i}')
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
+            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            print(f'len: {len(df)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
             labels, loss = self.clusterer.fit()

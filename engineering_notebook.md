@@ -153,3 +153,15 @@ This is the egnn results after adding new variables like x,y,z and v. It is much
 The new goal of the game is to first make a lot of plots to gain a deep understanding into the dataset. And then, we try to reproduce Kaley's work and using our algorithms with Kaley's settings. 
 
 9:00 PM, currently, I've just copied over the new dataset with velocity and locations and verified the validity of the data. Data are not very separable for heavy substructures. For ultra-faint dwarf galaxy however, one of the top 10 largest clusters is separable, but with the other stars, it might be hard.
+
+### December 15th, 2022 Thursday
+
+GNN based SNC seems to perform worse than GMM. I run the SNC with knn=10, and n_cluster=50. It achieves low-mid recall and relatively good precision. Then I increased knn=30 and n_cluster=100. It achieves high-mid recall and mid precision. 
+
+![Screenshot from 2022-12-15 00-01-59.png](assets/4a00e598ea821d28b7cfa837e05873e03bfa7ed1.png)
+
+The red one represents knn=10 and n_cluster=50. The yellow one is knn=30, n_cluster=100. Here are the two in the same order.
+
+![run with n=50, knn=10.png](assets/f54725fca1523cf7665605d36501c26d9824e411.png)
+
+![Screenshot from 2022-12-15 00-13-15.png](assets/7b8ba0418520718fabfaedfbf11961ff495aeddf.png)

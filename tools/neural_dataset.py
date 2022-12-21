@@ -123,10 +123,10 @@ class GraphDataset(PointDataset):
             self.C = self.labels[indices[0]] == self.labels[indices[1]]
 
     def initialize_dense(self, to_dense=False):
-        self.D = torch.ones((len(self.labels))) * (len(self.labels)-1)
-        self.A = torch.ones((len(self.labels), len(self.labels)))
+        self.D = torch.ones((len(self.features))) * (len(self.features)-1)
+        self.A = torch.ones((len(self.features), len(self.features)))
         if self.normalize:
-            self.A /= (len(self.labels)-1)
+            self.A /= (len(self.features)-1)
         self.A = self.A.to_sparse()
         if self.labels is None:
             self.C = None
@@ -155,7 +155,7 @@ class GraphDataset(PointDataset):
         else:
             y_indices = np.arange(len(self.features))[...,None]
             if self.knn is not None:
-                assert self.knn+1 < self.features.shape[0]/2
+                assert self.knn+1 < self.features.shape[0]
                 nbrs = NearestNeighbors(n_neighbors=self.knn+1, p=1, algorithm='kd_tree', n_jobs=-1).fit(self.features)
                 distances, y_indices = nbrs.kneighbors(self.features)
             if self.randomn is not None:
