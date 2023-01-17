@@ -28,7 +28,7 @@ def evaluate_param(n_components):
     return f_metrics
 
 results = {}
-for n_components in [2,4,8,16,30,40,50,60,70,80,90,100]:
+for n_components in ([2,4,8,16] + list(range(30, 500, 10))):
     metric = evaluate_param(n_components)
     results[n_components] = metric
 

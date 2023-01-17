@@ -55,10 +55,16 @@ class C_HDBSCAN(Clusterer):
 class C_GaussianMixture(Clusterer):
     def __init__(self, n_components=1, tol=0.001, init_params='kmeans', weights_init=None, means_init=None, precisions_init=None):
         super().__init__()
+        self.n_components = n_components
         self.cluster = GaussianMixture(n_components=n_components, covariance_type='full', tol=tol, reg_covar=1e-06, max_iter=100, n_init=1, init_params=init_params, weights_init=weights_init, means_init=means_init, precisions_init=precisions_init)
 
     def add_data(self, dataset):
         self.data = dataset.features
+        # this is a temporary addition for testing:
+        if len(dataset) < self.n_components:
+            self.cluster = GaussianMixture(n_components=len(dataset)) 
+        else:
+            self.cluster = GaussianMixture(n_components=self.n_components) 
 
     def fit(self, epoch=100):
         self.cluster.max_iter = epoch
