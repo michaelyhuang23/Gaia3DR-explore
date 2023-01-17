@@ -54,7 +54,7 @@ class CaterpillarTrainer:
         
         for train_id in self.train_ids:
             if train_id in val_ids: continue
-            self.train_step(train_id, train_epoch=1, repetition=10)
+            self.train_step(train_id, train_epoch=10, repetition=10)
         f_metric = self.evaluate_all(val_ids)     
         return f_metric
 

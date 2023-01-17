@@ -37,7 +37,7 @@ class CaterpillarEvaluator:
             print(f'size of dataset: {len(df)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
-            labels = self.clusterer.fit()
+            labels, loss = self.clusterer.fit()
             if torch.is_tensor(labels):
                 labels = labels.detach().cpu().numpy()
             t_labels = self.dataset.labels
