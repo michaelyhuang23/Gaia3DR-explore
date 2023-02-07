@@ -27,7 +27,7 @@ dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, k
 
 
 def evaluate_param(clustergen_regularizer=0.00001):
-	snc_clusterer = C_SNC(len(feature_columns), 150, similar_weight=1, egnn_lr=0.001, egnn_regularizer=0, clustergen_lr=0.003, clustergen_regularizer=clustergen_regularizer, device=device)
+	snc_clusterer = C_SNC(len(feature_columns), 50, similar_weight=1, egnn_lr=0.001, egnn_regularizer=0, clustergen_lr=0.003, clustergen_regularizer=clustergen_regularizer, device=device)
 	snc_clusterer.load_model('../weights/SNC/', 99)
 	evaluator = CaterpillarEvaluator(snc_clusterer, dataset, 1000000, filterer=filterer, run_on_test=True)
 	metric = evaluator.evaluate_all()

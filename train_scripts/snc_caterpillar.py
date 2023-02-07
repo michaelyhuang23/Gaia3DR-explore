@@ -25,11 +25,11 @@ def filterer(df):
     return df.loc[df['redshiftstar']<2].copy()
 
 dataset = GraphDataset(feature_columns, cluster_ids='cluster_id', scales=None, knn=None, randomn=None, normalize=True, discretize=False)
-snc_clusterer = C_SNC(len(feature_columns), 100, similar_weight=1, egnn_lr=0.001, egnn_regularizer=0, clustergen_lr=0.003, clustergen_regularizer=0.00001, device=device)
+snc_clusterer = C_SNC(len(feature_columns), 50, similar_weight=1, egnn_lr=0.001, egnn_regularizer=0, clustergen_lr=0.003, clustergen_regularizer=0.00001, device=device)
 
 trainer = CaterpillarTrainer(snc_clusterer, dataset, 10000000, val_size=4, k_fold=6, filterer=filterer, writer=writer)
 
-EPOCH = 100
+EPOCH = 1000
 for epoch in range(EPOCH):
 	print(f'EPOCH {epoch+1}')
 	metric = trainer.train_set(trainer.val_set[1])

@@ -40,7 +40,7 @@ class CaterpillarTrainer:
         with open(os.path.join(self.dataset_root, dataset_name+'_norm.json'), 'r') as f:
             df_norm = json.load(f)
         for i in range(train_epoch):
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            df = sample_space(df_, radius=0.01, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
             print(f'len: {len(df)}, {len(df_)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
@@ -69,7 +69,7 @@ class CaterpillarTrainer:
         metrics = []
         for i in range(eval_epoch):
             print(f'cluster iteration {i}')
-            df = sample_space(df_, radius=0.005, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size)
+            df = sample_space(df_, radius=0.01, radius_sun=0.0082, zsun_range=0.016/1000, sample_size=self.sample_size, filter_size=10)
             print(f'len: {len(df)}')
             self.dataset.load_data(df, df_norm)
             self.clusterer.add_data(self.dataset)
