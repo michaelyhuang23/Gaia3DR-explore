@@ -8,8 +8,10 @@ from collections import Counter
 def filter_clusters(df, filter_size):
     counter = Counter(df['cluster_id'].to_numpy())
     large_keys = [key for key in counter.keys() if counter[key] > filter_size]
+    small_keys = [key for key in counter.keys() if counter[key] <= filter_size]
     key2id = {key:i for i,key in enumerate(large_keys)}
-    df = df.loc[df['cluster_id'].isin(large_keys)].copy()
+    key2id.update({key:-1 for key in small_keys})
+    # df = df.loc[df['cluster_id'].isin(large_keys)].copy()
     df['cluster_id'] = df['cluster_id'].apply(lambda key : key2id[key])
     return df
 

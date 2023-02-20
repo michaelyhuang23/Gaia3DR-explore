@@ -54,6 +54,7 @@ class ClusterEvalIoU:
 
         self.TP = 0
         for cluster_id in unique_labels.keys():
+            if cluster_id == -1 : continue
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
             mode, count = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             IoU = count / (unique_labels[cluster_id]+unique_preds[mode]-count)
@@ -61,7 +62,7 @@ class ClusterEvalIoU:
                 self.TP+=1
 
         self.P = len(unique_preds) - (1 if unique_preds[-1]!=0 else 0)
-        self.T = len(unique_labels)
+        self.T = len(unique_labels) - (1 if unique_labels[-1]!=0 else 0)
         self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
         self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
         self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
@@ -80,6 +81,7 @@ class ClusterEvalMode:
 
         self.TP = 0
         for cluster_id in unique_labels.keys():
+            if cluster_id == -1 : continue
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
             mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             point_ids_preds = np.argwhere(self.preds == mode_pred)[:,0]
@@ -88,7 +90,7 @@ class ClusterEvalMode:
                 self.TP += 1
 
         self.P = len(unique_preds) - (1 if unique_preds[-1]!=0 else 0)
-        self.T = len(unique_labels)
+        self.T = len(unique_labels) - (1 if unique_labels[-1]!=0 else 0)
         self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
         self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
         self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
@@ -108,6 +110,7 @@ class ClusterEvalModeSoft:
 
         self.TP = 0
         for cluster_id in unique_labels.keys():
+            if cluster_id == -1 : continue
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
             ecounts = np.sum(self.preds[point_ids], axis=0)
             mode_pred = np.argmax(ecounts)
@@ -117,7 +120,7 @@ class ClusterEvalModeSoft:
                 self.TP += 1
 
         self.P = unique_preds_c
-        self.T = len(unique_labels)
+        self.T = len(unique_labels) - (1 if unique_labels[-1]!=0 else 0)
         self.precision = 0 if self.P==0 else self.TP / self.P  # what percent of clusters are actual clusters
         self.recall = 0 if self.T==0 else self.TP / self.T  # what percent of actual clusters are identified
         self.F1 = 0 if (self.precision==0 or self.recall==0) else 2 * self.precision * self.recall / (self.precision + self.recall)
@@ -135,6 +138,7 @@ class ClusterEvalModeC:
 
         self.TP_C = 0
         for cluster_id in unique_labels:
+            if cluster_id == -1 : continue
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
             mode_pred, count_pred = stats.mode(self.preds[point_ids], axis=None, keepdims=False)
             point_ids_preds = np.argwhere(self.preds == mode_pred)[:,0]
@@ -157,6 +161,7 @@ class ClusterEvalModeCSoft:
 
         self.TP_C = 0
         for cluster_id in unique_labels:
+            if cluster_id == -1 : continue
             point_ids = np.argwhere(self.labels == cluster_id)[:,0]
             ecounts = np.sum(self.preds[point_ids], axis=0)
             mode_pred = np.argmax(ecounts)
@@ -178,15 +183,19 @@ class ClusterEvalSoft:
         super().__init__()
         self.preds = preds
         self.labels = labels
+        self.noise_mask = labels == -1
         
         unique_labels = np.unique(self.labels)
+        unique_labels = unique_labels[unique_labels != -1]
         reverse_map = {label:i for i,label in enumerate(unique_labels)}
+        reverse_map[-1] = 0 # it doesn't matter, we will overwrite it
         self.labels = np.array([reverse_map[label] for label in self.labels])
         c_count = np.max(self.labels)+1
 
         C = np.zeros((len(self.labels), c_count))
         ids = np.arange(len(self.labels))
         C[ids, self.labels[ids]] = 1
+        C[self.noise_mask] = 0
 
         SP = np.log(self.preds + 0.0001)
         SN = np.log(1.0001 - self.preds)
